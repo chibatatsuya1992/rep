@@ -1,0 +1,1693 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>REP.</title>
+<meta name="description" content="筋トレのセット・重量・回数を記録するアプリ">
+<meta name="theme-color" content="#ECECEA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="REP.">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preload" href="fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+</head>
+<body>
+<style>
+@font-face{font-family:"Barlow Condensed";font-weight:500;font-style:normal;font-display:swap;src:url("fonts/barlow-condensed-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Barlow Condensed";font-weight:600;font-style:normal;font-display:swap;src:url("fonts/barlow-condensed-latin-600-normal.woff2") format("woff2")}
+@font-face{font-family:"Barlow Condensed";font-weight:700;font-style:normal;font-display:swap;src:url("fonts/barlow-condensed-latin-700-normal.woff2") format("woff2")}
+/* Layout: phone-first one-screen app — fixed header, scrolling work area, rest-timer strip, bottom tab bar.
+   Look: flat industrial — pale concrete greys, charcoal type, hairline frames, tight 6px corners,
+   one safety-orange accent for the action that matters. Body parts keep muted barbell-plate colors. */
+:root{
+  --bg:#D8D9D7; --surface:#ECECEA; --surface-2:#C9CBC8; --ink:#383B3F; --ink-2:#64686D; --ink-3:#7F8388; --line:#B9BCB9;
+  --accent:#F2661B; --accent-ink:#383B3F; --accent-soft:#F6DFD0; --danger:#C4302A; --good:#2F8656;
+  --p-chest:#C8453F; --p-back:#3F63B8; --p-legs:#C09A1E; --p-shoulder:#3E8A5E; --p-arms:#6E7378; --p-core:#7458B8; --p-cardio:#2E8C95;
+  --f-num:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --f-body:"Hiragino Sans","Hiragino Kaku Gothic ProN","ヒラギノ角ゴシック","Hiragino Kaku Gothic Pro","Noto Sans JP","Noto Sans CJK JP",system-ui,sans-serif;
+  --r:6px;
+  color-scheme:light;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+html{box-sizing:border-box;background:var(--surface);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+#updbar{position:fixed;left:16px;right:16px;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--ink);color:#F3F3F1;padding:10px 12px;border-radius:6px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgb(0 0 0 / .25)}
+#updbar button{background:var(--accent);color:var(--accent-ink);font-weight:700;border-radius:4px;padding:6px 12px}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.ic{width:22px;height:22px;flex:none}
+h2,h3{margin:0;text-wrap:balance}
+
+#app{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;background:var(--bg)}
+#top{display:grid;grid-template-columns:minmax(44px,auto) 1fr minmax(44px,auto);align-items:center;gap:8px;padding:8px 16px;min-height:56px;border-bottom:1px solid var(--line);background:var(--bg)}
+#top h1{margin:0;font-size:17px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#top .brand{font-family:var(--f-num);font-weight:700;font-size:26px;letter-spacing:.08em;line-height:1}
+#top .brand i{font-style:normal;color:var(--accent)}
+.hbtn{display:inline-flex;align-items:center;justify-content:center;gap:2px;min-width:44px;height:44px;border-radius:12px;color:var(--ink)}
+.hbtn:active{background:var(--surface-2)}
+.hright{justify-self:end}
+#main{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 16px 28px;display:flex;flex-direction:column;gap:16px;overscroll-behavior:contain}
+#main > *{flex-shrink:0}
+#pickList > *,.card > .chips,section > .chips{flex-shrink:0}
+#tabs{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:var(--surface)}
+#tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 6px;font-size:11px;font-weight:500;color:var(--ink-3)}
+#tabs button[aria-current="true"]{color:var(--accent)}
+
+/* generic */
+.card{background:var(--surface);border-radius:var(--r);padding:14px}
+.sec-title{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:13px;font-weight:700;color:var(--ink-2);letter-spacing:.04em}
+.muted{color:var(--ink-2)}
+.small{font-size:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border-radius:12px;font-weight:700;background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.big{min-height:54px;font-size:16px;width:100%}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.sm{min-height:36px;padding:0 12px;font-size:13px}
+.btn:disabled{opacity:.45}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:2px}
+.seg button{padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;color:var(--ink-2);min-height:32px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .12)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink-2);background:var(--surface);min-height:34px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--c,var(--ink-3))}
+.tf{width:100%;min-height:44px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;font-size:16px}
+.tf:focus{border-color:var(--accent);outline:none}
+select.tf{appearance:auto}
+.banner{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--accent-soft);border-radius:12px;padding:10px 12px;font-size:13px}
+.empty{padding:22px 14px;text-align:center;color:var(--ink-2);font-size:14px}
+
+/* home */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-head h2{font-family:var(--f-num);font-size:26px;font-weight:700;letter-spacing:.02em}
+.cal-head h2 small{font-size:15px;color:var(--ink-2);margin-left:6px;font-weight:600}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-wd{font-size:11px;text-align:center;color:var(--ink-3);font-weight:700;padding-bottom:2px}
+.cal-wd:first-child{color:var(--danger)}
+.cal-day{position:relative;aspect-ratio:1/1;max-width:100%;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:var(--f-num);font-size:17px;font-weight:600;color:var(--ink)}
+.cal-day.out{color:var(--ink-3);opacity:.5}
+.cal-day.on{background:var(--accent-soft)}
+.cal-day.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.cal-dots{display:flex;gap:2px;height:6px}
+.cal-dots .dot{width:6px;height:6px}
+.cal-foot{display:flex;gap:18px;align-items:baseline;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:12px;color:var(--ink-2);font-weight:700}
+.cal-foot b{font-family:var(--f-num);font-size:26px;color:var(--ink);margin:0 3px 0 6px}
+.figs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 14px}
+.fig{min-width:0}
+.fig span{display:block;font-size:11px;color:var(--ink-2);font-weight:700}
+.fig b{font-family:var(--f-num);font-size:28px;font-weight:700;line-height:1.1;white-space:nowrap}
+.fig b small{font-size:15px;margin-left:2px;color:var(--ink-2)}
+.weeks{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:12px}
+.weeks .lbl{color:var(--ink-2);font-weight:700}
+.weeks .trk{height:10px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.weeks .bar{height:100%;background:var(--accent);border-radius:0 3px 3px 0;opacity:.45}
+.weeks .bar.cur{opacity:1}
+.weeks .val{font-family:var(--f-num);font-size:14px;text-align:right;min-width:52px}
+
+/* day */
+.daynav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.daynav h2{font-size:18px;font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tile{background:var(--surface);border-radius:12px;padding:8px 10px;min-width:0}
+.tile span{display:block;font-size:11px;color:var(--ink-2);font-weight:700;white-space:nowrap}
+.tile b{font-family:var(--f-num);font-size:24px;font-weight:700;line-height:1.15;white-space:nowrap}
+.tile b small{font-size:13px;color:var(--ink-2);margin-left:1px}
+.wcard{background:var(--surface);border-radius:var(--r);overflow:hidden}
+.whead{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 14px;border-left:4px solid var(--c)}
+.whead .name{flex:1;min-width:0;text-align:left;font-weight:700;font-size:16px;padding:8px 0;display:flex;flex-direction:column}
+.whead .name small{font-size:12px;color:var(--ink-2);font-weight:500}
+.iconbtn{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;color:var(--ink-2)}
+.iconbtn:active{background:var(--surface-2)}
+.iconbtn:disabled{opacity:.3}
+.armed{background:var(--danger);color:#fff;border-radius:10px;padding:0 10px;height:40px;font-size:13px;font-weight:700}
+.wsets{display:grid;grid-template-columns:auto auto auto 1fr;gap:2px 12px;padding:4px 14px 12px 18px;font-size:15px;align-items:baseline;width:100%;text-align:left}
+.wsets .n{color:var(--ink-3);font-family:var(--f-num)}
+.wsets .v{font-family:var(--f-num);font-size:18px;font-weight:600;white-space:nowrap}
+.wsets .v small{font-size:12px;color:var(--ink-2);font-weight:500;margin-left:1px}
+.wsets .rmv{font-family:var(--f-num);color:var(--ink-2);text-align:right;font-size:14px}
+.wsets .note{grid-column:2/-1;font-size:12px;color:var(--ink-2);margin-top:-2px}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:var(--surface-2);color:var(--ink-2);vertical-align:2px;margin-left:4px;font-family:var(--f-body)}
+
+/* picker */
+.part{background:var(--surface);border-radius:var(--r);overflow:hidden}
+.part-h{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.part-h h3{font-size:15px;font-weight:700;flex:1;min-width:0}
+.part-h .since{font-size:12px;color:var(--ink-2);font-weight:500}
+.exrow{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);min-height:50px;padding:0 8px 0 14px}
+.exrow:last-of-type{border-bottom:0}
+.exrow .go{flex:1;min-width:0;text-align:left;padding:12px 0;font-size:15px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.exrow .go small{color:var(--ink-3);font-size:12px;white-space:nowrap}
+.exrow .go .added{color:var(--accent);font-weight:700}
+.exrow .tf{min-height:38px;font-size:15px}
+.addrow{display:flex;gap:8px;padding:10px 14px;background:var(--bg);background:color-mix(in srgb,var(--surface-2) 45%,var(--surface))}
+.addrow .tf{min-height:40px;font-size:15px}
+.swatch{width:26px;height:26px;border-radius:50%;background:var(--c);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line)}
+
+/* exercise entry */
+.extop{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
+.pb{flex:1 1 150px;background:var(--surface);border-radius:12px;padding:8px 12px;font-size:12px;color:var(--ink-2);font-weight:700;display:flex;gap:14px}
+.pb div{min-width:0}
+.pb b{display:block;font-family:var(--f-num);font-size:20px;color:var(--ink);line-height:1.2;white-space:nowrap}
+.rest{flex:1 1 190px;display:flex;align-items:center;gap:4px;background:var(--surface);border-radius:12px;padding:4px 4px 4px 8px}
+.rest .sec{font-family:var(--f-num);font-size:22px;font-weight:700;min-width:56px;text-align:center}
+.rest .btn{margin-left:auto;min-height:40px}
+.last{background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+.last .grow{font-size:14px}
+.last .when{font-size:12px;color:var(--ink-2);font-weight:700;margin-bottom:2px}
+.last .ls{font-family:var(--f-num);font-size:16px;display:flex;flex-wrap:wrap;gap:2px 12px}
+.sets{display:flex;flex-direction:column;gap:8px}
+.set{background:var(--surface);border-radius:12px;padding:8px 8px 6px 10px;border:1px solid transparent}
+.set.done{border-color:var(--good);background:color-mix(in srgb,var(--good) 7%,var(--surface))}
+.set-main{display:flex;align-items:center;gap:6px}
+.set-no{font-size:22px;font-weight:700;width:22px;text-align:center;color:var(--ink-2)}
+.fld{flex:1;min-width:0;display:flex;align-items:baseline;gap:3px;border-bottom:2px solid var(--line);padding:0 2px}
+.fld:focus-within{border-color:var(--accent)}
+.fld input{width:100%;min-width:0;border:0;background:transparent;font-family:var(--f-num);font-size:26px;font-weight:700;text-align:right;padding:2px 0;outline:none}
+.fld input::placeholder{color:var(--ink-3);opacity:.6;font-weight:500}
+.fld span{font-size:12px;color:var(--ink-2);font-weight:700}
+.x{color:var(--ink-3);font-size:14px}
+.done-btn{width:46px;height:46px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;border:2px solid var(--line);color:var(--ink-3);flex:none}
+.done-btn[aria-pressed="true"]{background:var(--good);border-color:var(--good);color:#fff}
+.set-sub{display:flex;align-items:center;gap:4px;margin-top:4px}
+.set-sub .rm{font-size:13px;color:var(--ink-2);min-width:66px;white-space:nowrap}
+.set-sub .memo{flex:1;min-width:0;border:0;border-bottom:1px dashed var(--line);background:transparent;font-size:14px;padding:6px 2px;outline:none}
+.set-sub .memo:focus{border-bottom-color:var(--accent)}
+.mini{height:34px;min-width:34px;padding:0 8px;border-radius:8px;font-size:12px;font-weight:700;color:var(--ink-2);display:inline-flex;align-items:center;justify-content:center}
+.mini .ic{width:18px;height:18px}
+.mini.on{background:var(--ink);color:var(--bg)}
+.mini:active{background:var(--surface-2)}
+
+/* timer strip */
+#timerbar{background:var(--ink);color:var(--bg);display:flex;align-items:center;gap:10px;padding:8px 16px;position:relative;overflow:hidden}
+#timerbar .prog{position:absolute;left:0;bottom:0;height:3px;background:var(--accent)}
+#timerbar .t{font-family:var(--f-num);font-size:30px;font-weight:700;line-height:1}
+#timerbar .lbl{font-size:12px;font-weight:700;opacity:.75;flex:1}
+#timerbar button{min-height:36px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:700;border:1px solid color-mix(in srgb,var(--bg) 35%,transparent)}
+#timerbar.fin{background:var(--good);color:#fff}
+#timerbar.fin button{border-color:rgb(255 255 255 / .5)}
+
+/* charts */
+.chart{position:relative;touch-action:pan-y}
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .axis{fill:var(--ink-3);font-family:var(--f-num);font-size:11px}
+.chart .line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .area{fill:var(--accent);opacity:.1}
+.chart .pt{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+.chart .endlbl{fill:var(--ink);font-family:var(--f-num);font-size:13px;font-weight:700}
+.chart .guide{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 3}
+.chart .hi{fill:var(--surface);stroke:var(--accent);stroke-width:2.5}
+.chart .tip{position:absolute;top:-6px;transform:translate(-50%,-100%);background:var(--ink);color:var(--bg);padding:4px 9px;border-radius:8px;font-size:12px;white-space:nowrap;pointer-events:none;display:flex;gap:8px;align-items:baseline}
+.chart .tip b{font-family:var(--f-num);font-size:16px}
+.chart-empty{padding:28px 10px;text-align:center;color:var(--ink-2);font-size:13px;background:var(--surface-2);border-radius:10px}
+.hcal .cal-day{font-size:15px;gap:0}
+.hcal .cal-day em{font-style:normal;font-size:10px;color:var(--ink-2);line-height:1}
+.pbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sess{display:flex;flex-direction:column}
+.sess button{display:grid;grid-template-columns:70px 1fr;gap:8px;text-align:left;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.sess button:last-child{border-bottom:0}
+.sess .d{font-family:var(--f-num);font-weight:700;color:var(--ink-2)}
+.sess .s{font-family:var(--f-num);font-size:15px}
+
+/* body */
+.bfields{display:flex;flex-direction:column}
+.bf{display:grid;grid-template-columns:1fr 120px 44px;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.bf:last-child{border-bottom:0}
+.bf label{font-weight:700;font-size:15px}
+.bf input{border:0;border-bottom:2px solid var(--line);background:transparent;font-family:var(--f-num);font-size:24px;font-weight:700;text-align:right;width:100%;padding:2px 0;outline:none}
+.bf input:focus{border-color:var(--accent)}
+.bf input::placeholder{color:var(--ink-3);opacity:.6;font-weight:500}
+.bf .u{font-size:12px;color:var(--ink-2);font-weight:700}
+.bcalc{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.bcalc div span{display:block;font-size:11px;font-weight:700;color:var(--ink-2)}
+.bcalc div b{font-family:var(--f-num);font-size:24px}
+.bcalc div b small{font-size:12px;color:var(--ink-2);margin-left:2px}
+
+/* rm */
+.rm-in{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:end}
+.rm-in .fld input{font-size:34px}
+.rm-out{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.rm-out span{font-size:13px;font-weight:700;color:var(--ink-2)}
+.rm-out b{font-family:var(--f-num);font-size:52px;line-height:1;font-weight:700;color:var(--accent)}
+.rm-out b small{font-size:20px;color:var(--ink-2);margin-left:4px}
+.tblwrap{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:14px}
+table.t th{font-size:11px;color:var(--ink-2);text-align:right;padding:6px 8px;font-weight:700;border-bottom:1px solid var(--line)}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);font-family:var(--f-num);font-size:17px}
+table.t tr:last-child td{border-bottom:0}
+table.t tr.hl td{background:var(--accent-soft);font-weight:700}
+table.t td.pct{color:var(--ink-2);font-size:15px}
+
+/* settings */
+.setlist{display:flex;flex-direction:column}
+.si{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.si:last-child{border-bottom:0}
+.si > span{font-weight:700;font-size:15px}
+.si small{display:block;font-weight:400;color:var(--ink-2);font-size:12px}
+.si .tf{width:auto;min-width:0;max-width:100%}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700}
+.status .dot{--c:var(--ink-3)}
+.status.on .dot{--c:var(--good)}
+.status.err .dot{--c:var(--danger)}
+textarea.tf{min-height:120px;font-family:ui-monospace,monospace;font-size:12px}
+
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13px;font-weight:700;max-width:calc(100% - 32px);z-index:10;box-shadow:0 6px 20px rgb(0 0 0 / .25)}
+@media (prefers-reduced-motion: no-preference){
+  .set,.done-btn,.chip{transition:background-color .15s,border-color .15s,color .15s}
+  #timerbar .prog{transition:width .25s linear}
+}
+
+/* ---------- flat industrial finish ---------- */
+.card,.wcard,.part,.tile,.set,.pb,.rest{border:1px solid var(--line);box-shadow:none}
+.card,.wcard,.part,.tile,.set,.pb,.rest,.last,.banner,.btn,.seg,.tf,.addrow,.done-btn,.cal-day,.chart-empty{border-radius:6px}
+.seg button,.mini,.iconbtn,.hbtn,.armed{border-radius:4px}
+.chip{border-radius:4px}
+#top{background:var(--surface);border-bottom:2px solid var(--ink)}
+#top .brand{font-family:"Poppins","Helvetica Neue",Arial,sans-serif;font-weight:700;font-size:26px;letter-spacing:.02em}
+#top .brand i{color:var(--accent)}
+#top .brand .logo{display:block;height:24px;width:auto;color:var(--ink)}
+#top .brand .sq{display:inline-block;width:.21em;height:.21em;background:var(--accent);margin-left:.07em;vertical-align:baseline}
+#top h1{letter-spacing:.06em}
+#tabs{border-top:1px solid var(--line)}
+#tabs button{position:relative}
+#tabs button[aria-current="true"]{color:var(--ink)}
+#tabs button[aria-current="true"]::before{content:"";position:absolute;top:-1px;left:22%;right:22%;height:3px;background:var(--accent)}
+#tabs button[aria-current="true"] .ic{color:var(--accent)}
+.sec-title{letter-spacing:.1em}
+.btn{border:1px solid var(--ink-3);background:var(--surface)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);letter-spacing:.06em}
+.btn.primary:active{filter:brightness(.94)}
+.seg{background:var(--surface-2)}
+.seg button[aria-pressed="true"]{box-shadow:0 0 0 1px var(--line)}
+.cal-day.on{background:var(--surface-2);font-weight:700}
+.cal-day.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.cal-foot{border-top-style:solid}
+.whead{border-left-width:4px}
+.last,.banner{border:1px dashed var(--ink-3);background:transparent}
+.banner{border-color:var(--accent);background:var(--accent-soft)}
+.fld{border-bottom-width:2px}
+.fld:focus-within,.tf:focus{border-color:var(--accent)}
+.done-btn{background:var(--surface)}
+.weeks .trk{border-radius:0}
+.weeks .bar{background:var(--ink);opacity:.35;border-radius:0}
+.weeks .bar.cur{background:var(--accent);opacity:1}
+#timerbar{background:var(--ink);color:#F3F3F1}
+#timerbar .prog{background:var(--accent);height:4px}
+#timerbar button{border-color:rgb(255 255 255 / .3);border-radius:4px}
+#timerbar.fin{background:var(--good)}
+#toast{background:var(--ink);color:#F3F3F1;border-radius:6px}
+.chart .line{stroke:var(--ink)}
+.chart .area{fill:var(--ink);opacity:.06}
+.chart .pt{fill:var(--ink);stroke:var(--surface)}
+.chart .pt.end{fill:var(--accent)}
+.chart .hi{stroke:var(--accent)}
+.chart .tip{background:var(--ink);color:#F3F3F1;border-radius:4px}
+table.t tr.hl td{background:var(--accent-soft)}
+table.t tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+
+/* assist + condition */
+.assist{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.assist .lbl,.cond .lbl{font-size:12px;font-weight:700;color:var(--ink-2);min-width:3em}
+.seg.sm button{min-height:30px;padding:4px 12px;font-size:12px}
+.fld.ar{flex:0 0 92px}
+.fld.ar input{font-size:22px}
+.fld.ar span:first-child{color:var(--ink-2)}
+.assist .rm{margin-left:auto;font-size:13px;color:var(--ink-2);white-space:nowrap}
+.cond{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
+.cond-h{display:flex;align-items:center;gap:8px}
+.feel{flex:1;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;min-width:0}
+.cond-t{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink-2);min-height:32px;text-align:left;min-width:0}
+.cond-t .ic{width:16px;height:16px}
+.cond-t em{font-style:normal;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.cond-b{display:flex;flex-direction:column;gap:8px}
+.tagpick{display:flex;flex-wrap:wrap;gap:6px}
+.tagpick button{min-height:32px;padding:0 10px;font-size:12px;font-weight:700;color:var(--ink-2);border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+.tagpick button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.memo2{min-height:64px;font-size:15px;resize:vertical}
+.set-tools{display:flex;align-items:center;gap:4px;margin-top:6px}
+.set-tools .mini{gap:4px}
+
+/* effort scale — status badge look */
+:root{ --lv1:#A9AEB1; --lv2:#83898D; --lv3:#5D6166; --lv4:#383B3F; --lv5:var(--accent) }
+.eff-lbl{font-size:13px!important;letter-spacing:.14em;color:var(--ink)!important;min-width:0!important}
+.cond-h{flex-direction:column;align-items:stretch;gap:6px}
+.cond-h .eff-lbl{align-self:flex-start}
+.feel{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.feel button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:44px;padding:4px 2px;background:var(--surface);border:1px solid var(--line);border-radius:4px;color:var(--ink-3)}
+.feel button span{font-family:var(--f-num);font-weight:700;font-size:11.5px;letter-spacing:.02em;max-width:100%;overflow:hidden;line-height:1;white-space:nowrap}
+.bars{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
+.bars b{display:block;width:3px;background:currentColor;opacity:.22;border-radius:1px}
+.bars b.on{opacity:1}
+.feel button[aria-pressed="true"]{color:#fff;border-color:transparent}
+.feel button.lv1[aria-pressed="true"]{background:var(--lv1);color:var(--ink)}
+.feel button.lv2[aria-pressed="true"]{background:var(--lv2)}
+.feel button.lv3[aria-pressed="true"]{background:var(--lv3)}
+.feel button.lv4[aria-pressed="true"]{background:var(--lv4);box-shadow:inset 0 -3px 0 var(--accent)}
+.feel button.lv5[aria-pressed="true"]{background:var(--lv5);color:var(--accent-ink)}
+.eff{display:inline-flex;align-items:center;gap:5px;font-family:var(--f-num);font-weight:700;font-size:12px;letter-spacing:.08em;line-height:1;padding:3px 7px 3px 6px;border-radius:3px;margin-right:8px;vertical-align:1px;color:#fff}
+.eff .bars{height:10px}.eff .bars b{width:2.5px}
+.eff.lv1{background:var(--lv1);color:var(--ink)}
+.eff.lv2{background:var(--lv2)}
+.eff.lv3{background:var(--lv3)}
+.eff.lv4{background:var(--lv4);box-shadow:inset 0 -2px 0 var(--accent)}
+.eff.lv5{background:var(--lv5);color:var(--accent-ink)}
+
+/* exercise type colors */
+:root{ --compound:#A3241E; --isolation:#1E3C8C }
+.xt{display:inline-flex;align-items:center;font-family:var(--f-num);font-weight:700;font-size:10.5px;letter-spacing:.1em;line-height:1;padding:3px 6px;border-radius:3px;margin-left:8px;vertical-align:2px;color:#fff;white-space:nowrap}
+.xt.c{background:var(--compound)}
+.xt.i{background:var(--isolation);color:#fff}
+.xt.n{background:transparent;color:var(--ink-3);box-shadow:inset 0 0 0 1px var(--line)}
+.exrow{box-shadow:inset 4px 0 0 transparent}
+.exrow.t-c{box-shadow:inset 4px 0 0 var(--compound)}
+.exrow.t-i{box-shadow:inset 4px 0 0 var(--isolation)}
+.exrow .go .nm{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.exrow .go .nm .xt{margin-left:0;vertical-align:0}
+.exrow .go{padding:10px 0}
+.xt-btn{flex:none;min-height:38px;display:inline-flex;align-items:center}
+.xt-btn .xt{margin-left:0}
+.xt-legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:12px;color:var(--ink-2);font-weight:700}
+.xt-legend > span{display:inline-flex;align-items:center;gap:6px}
+.xt-legend .xt{margin-left:0}
+.daynav .xt{margin-left:6px}
+/* stylish English placeholders */
+.fld input.ph-txt::placeholder{font-size:15px;font-weight:700;letter-spacing:.16em;opacity:.55}
+
+/* quick RM table on the entry screen */
+.rmq{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px 10px;display:flex;flex-direction:column;gap:8px}
+.rmq-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rmq-t{display:inline-flex;align-items:center;gap:6px;min-height:36px;color:var(--ink)}
+.rmq-t .ic{width:16px;height:16px}
+.rmq-t span{font-weight:700;font-size:15px;letter-spacing:.14em}
+.rmq-base{display:flex;align-items:baseline;gap:6px;font-size:11px;font-weight:700;color:var(--ink-2)}
+.rmq-base input{width:64px;border:0;border-bottom:2px solid var(--line);background:transparent;font-size:22px;font-weight:700;text-align:right;padding:0;outline:none}
+.rmq-base input:focus{border-color:var(--accent)}
+.rmq-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;scroll-snap-type:x proximity}
+.rmq-row::-webkit-scrollbar{display:none}
+.rmq-c{flex:0 0 64px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;border-radius:4px;background:var(--surface-2);border:1px solid transparent}
+.rmq-c:active{border-color:var(--accent);background:var(--accent-soft)}
+.rmq-c .r{font-size:12px;font-weight:700;color:var(--ink-2);letter-spacing:.04em}
+.rmq-c .r small{font-size:9px;margin-left:2px;letter-spacing:.1em}
+.rmq-c b{font-size:21px;line-height:1.1;color:var(--ink)}
+.rmq-c .p{font-size:11px;color:var(--ink-3)}
+.rmq-empty{font-size:12px;color:var(--ink-2);padding:4px 0}
+.rmq-hint{font-size:11px;color:var(--ink-3)}
+
+/* rmq swipe affordance */
+.rmq-wrap{position:relative}
+.rmq-wrap::after{content:"";position:absolute;top:0;right:0;bottom:2px;width:36px;background:linear-gradient(90deg,transparent,var(--surface));pointer-events:none;transition:opacity .2s}
+.rmq-wrap.at-end::after{opacity:0}
+.rmq-foot{display:flex;align-items:center;gap:10px}
+.rmq-track{position:relative;flex:1;height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden}
+.rmq-track span{position:absolute;top:0;bottom:0;left:0;background:var(--accent);border-radius:2px;transition:left .08s linear}
+.rmq-swipe{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--ink-2);transition:opacity .2s}
+.rmq-swipe .ic{width:13px;height:13px;stroke-width:2.6}
+.rmq-swipe.done{opacity:.3}
+@media (prefers-reduced-motion: no-preference){ .rmq-swipe:not(.done) .ic{animation:nudge 1.4s ease-in-out infinite} }
+@keyframes nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(3px)}}
+/* compact effort */
+.cond-h{flex-direction:row!important;align-items:center!important;gap:8px!important}
+.eff-lbl{font-size:11px!important;letter-spacing:.14em;color:var(--ink-2)!important}
+.feel{gap:0!important;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--surface)}
+.feel button{flex-direction:row!important;gap:3px!important;min-height:28px!important;padding:0 2px!important;border:0!important;border-radius:0!important;border-left:1px solid var(--line)!important;background:transparent}
+.feel button:first-child{border-left:0!important}
+.feel button span{font-size:11px!important;letter-spacing:.05em!important;text-overflow:clip}
+.feel button .bars{height:10px}
+.feel button .bars b{width:2px}
+.feel button[aria-pressed="true"]{border-left-color:transparent!important}
+.cond{gap:4px!important}
+
+/* ---------- set methods ---------- */
+.mi{width:22px;height:22px}
+.mpick{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.mp-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.mp-h .num{font-weight:700;font-size:13px;letter-spacing:.16em}
+.mp-ja{font-size:12px;font-weight:700;color:var(--ink-2)}
+.mp-row{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.mpick.g .mp-row{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mp-b{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:56px;padding:6px 1px;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
+.mp-b span{font-weight:700;font-size:9.5px;letter-spacing:.02em;line-height:1.05;white-space:nowrap;max-width:100%;overflow:hidden;text-align:center}
+.mp-b[aria-checked="true"]{background:var(--ink);color:var(--surface)}
+.mp-b[aria-checked="true"] .mi{color:var(--accent)}
+.mp-desc{margin:0;font-size:12px;color:var(--ink-2);line-height:1.6}
+.mp-param{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px dashed var(--line);padding-top:6px;font-size:12px;font-weight:700;color:var(--ink-2)}
+.mp-step{display:flex;align-items:center;gap:2px}
+.mp-step b{font-size:20px;color:var(--ink);min-width:64px;text-align:center}
+.mb{display:inline-flex;align-items:center;gap:4px;background:var(--ink);color:var(--surface);font-family:var(--f-num);font-weight:700;font-size:11px;letter-spacing:.1em;line-height:1;padding:3px 7px 3px 4px;border-radius:3px;vertical-align:-1px;white-space:nowrap}
+.mb .mi{width:14px;height:14px;color:var(--accent)}
+.gbanner{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--ink-2)}
+.gbanner .btn{margin-left:auto}
+/* sub segments (drop / rest-pause) */
+.subs{display:flex;flex-direction:column;gap:6px;margin:6px 0 0 28px;padding-left:10px;border-left:2px solid var(--accent)}
+.sub{display:flex;align-items:center;gap:6px}
+.sub .fld input{font-size:22px}
+.sub-i{display:flex;flex-direction:column;align-items:center;min-width:40px;color:var(--accent)}
+.sub-i .mi{width:18px;height:18px}
+.sub-i small{font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--ink-2);white-space:nowrap}
+.addsub{display:flex;align-items:center;gap:8px;min-height:38px;padding:0 10px;border:1px dashed var(--ink-3);border-radius:4px;color:var(--ink);text-align:left}
+.addsub .mi{width:18px;height:18px;color:var(--accent)}
+.addsub .num{font-weight:700;font-size:14px;letter-spacing:.08em}
+.addsub small{font-size:11px;color:var(--ink-2);margin-left:auto}
+.ascd{display:inline-flex;align-items:center;gap:3px;margin:4px 0 0 28px;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.04em}
+.ascd .mi{width:15px;height:15px}
+.wsets .subl{display:flex;align-items:center;gap:6px;color:var(--ink)}
+.wsets .subl .mi{width:14px;height:14px;color:var(--accent)}
+/* group card on day view */
+.gcard{border:1px solid var(--line);border-radius:6px;background:var(--surface-2);overflow:hidden}
+.ghead{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+.gname{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:40px;text-align:left}
+.gname{flex-wrap:wrap;row-gap:2px}
+.gname small{font-size:12px;color:var(--ink-2);font-weight:700;white-space:nowrap}
+#main > .rest{flex:0 0 auto}
+.gbody{display:flex;flex-direction:column;gap:1px}
+.wcard.inner{border:0!important;border-radius:0!important}
+.gl{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;border-radius:3px;background:var(--ink);color:var(--surface);font-weight:700;font-size:14px;line-height:1}
+.gl.ghost{background:transparent;color:var(--ink-3);box-shadow:inset 0 0 0 1.5px var(--ink-3)}
+.whead .gl{margin-right:2px}
+/* group entry view */
+.gmembers{background:var(--surface);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column}
+.gm{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 12px;border-bottom:1px solid var(--line)}
+.gm-n{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;min-height:44px}
+.gm-n .nm{display:flex;flex-direction:column;align-items:flex-start;gap:3px;font-weight:700}
+.gm-n .nm .xt{margin-left:0}
+.gm-n small{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.gslot{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 12px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line);text-align:left}
+.gslot:last-child,.gm:last-child{border-bottom:0}
+.gslot .ic{width:18px;height:18px;color:var(--accent)}
+.rounds{display:flex;flex-direction:column;gap:10px}
+.round{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 8px 8px 10px}
+.round.done{border-color:var(--good)}
+.round-h{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.round-h .num{font-weight:700;font-size:15px;letter-spacing:.14em}
+.gr-row{display:flex;align-items:center;gap:10px}
+.gr-in{flex:1;min-width:0}
+.gr-in small{display:block;font-size:11px;font-weight:700;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gr-f{display:flex;align-items:center;gap:6px}
+.gr-f .fld input{font-size:24px}
+.gr-link{display:flex;align-items:center;gap:4px;margin:2px 0 2px 2px;font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--accent)}
+.gr-link .ic{width:14px;height:14px}
+.gr-rest{display:flex;align-items:center;gap:4px;margin-top:8px;padding-top:6px;border-top:1px dashed var(--line);font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--ink-2)}
+.gr-rest .ic{width:14px;height:14px}
+</style>
+
+<div id="app">
+  <header id="top"></header>
+  <main id="main"></main>
+  <div id="timerbar" hidden></div>
+  <nav id="tabs" aria-label="メインメニュー"></nav>
+</div>
+<div id="toast" role="status" hidden></div>
+<div id="updbar" hidden><span>新しいバージョンがあります</span><button type="button" onclick="location.reload()">更新する</button></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script>
+"use strict";
+/* ---------- utilities ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2, "0");
+const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseK = k => { const [y,m,d] = k.split("-").map(Number); return new Date(y, m-1, d); };
+const addDays = (k, n) => { const d = parseK(k); d.setDate(d.getDate()+n); return keyOf(d); };
+const todayK = () => keyOf(new Date());
+const daysBetween = (a, b) => Math.round((parseK(b) - parseK(a)) / 864e5);
+const WD = ["日","月","火","水","木","金","土"];
+const fmtDate = k => { const d = parseK(k); return `${d.getMonth()+1}月${d.getDate()}日(${WD[d.getDay()]})`; };
+const fmtMD = k => { const d = parseK(k); return `${d.getMonth()+1}/${d.getDate()}`; };
+const uid = () => Math.random().toString(36).slice(2, 9);
+const clone = o => JSON.parse(JSON.stringify(o));
+const num = v => { const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : null; };
+const round1 = v => Math.round(v * 10) / 10;
+const trimNum = (v, d = 2) => v == null ? "" : String(Math.round(v * 10**d) / 10**d);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+const ICONS = {
+  home:'<path d="M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z"/>',
+  chart:'<path d="M4 4v16h16"/><path d="m7.5 14.5 4-4.5 3 3 5-6"/>',
+  scale:'<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 10a4 4 0 0 1 8 0z"/><path d="m12 10 1.5-2"/>',
+  dumbbell:'<path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"/>',
+  sliders:'<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+  left:'<path d="m14.5 5-7 7 7 7"/>', right:'<path d="m9.5 5 7 7-7 7"/>',
+  up:'<path d="m6 14.5 6-6 6 6"/>', down:'<path d="m6 9.5 6 6 6-6"/>',
+  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>', trash:'<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
+  copy:'<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V5a.5.5 0 0 0-.5-.5H5a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h3.5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', same:'<path d="M12 4.5v13M6.5 12.5l5.5 5.5 5.5-5.5"/>',
+  timer:'<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 3h5"/>', minus:'<path d="M5 12h14"/>'
+};
+const ic = n => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+
+/* ---------- state ---------- */
+const LS_KEY = "replog.v1";
+const COLORS = ["chest","back","legs","shoulder","arms","core","cardio"];
+const DEFAULT_SETTINGS = { unit:"kg", height:null, rest:90, formula:"o40", round:2.5 };
+function defaultParts(){
+  const mk = (name, color, list, kind) => ({ id:uid(), name, color, kind:kind||"weight", ex:list.map(n => ({ id:uid(), name:n })) });
+  return [
+    mk("胸","chest",["ベンチプレス","インクラインダンベルプレス","インクラインプレス","デクラインチェストプレス","ダンベルフライ","チェストプレス","ペックフライ","ディップス"]),
+    mk("背中","back",["デッドリフト","ラットプルダウン","シーテッドロー","ベントオーバーロー","Tバーロウ","ワンハンドロー","懸垂"]),
+    mk("脚","legs",["スクワット","ブルガリアンスクワット","ハックスクワット","レッグプレス","レッグエクステンション","レッグカール","カーフレイズ"]),
+    mk("肩","shoulder",["ダンベルショルダープレス","ショルダープレス","サイドレイズ","マシンサイドレイズ","リアレイズ","アップライトロー"]),
+    mk("腕","arms",["バーベルカール","ダンベルカール","ハンマーカール","トライセプスプッシュダウン","フレンチプレス","ナローベンチプレス"]),
+    mk("腹","core",["クランチ","レッグレイズ","アブローラー","ケーブルクランチ"]),
+    mk("有酸素運動","cardio",["トレッドミル","エアロバイク","クロストレーナー"],"cardio")
+  ];
+}
+function defaultState(){ return { v:1, settings:{...DEFAULT_SETTINGS}, parts:defaultParts(), days:{}, _mt:{}, demo:false }; }
+
+let state = defaultState();
+let hadLocal = false;
+let DEMO = {};
+let exMap = null;
+
+function saveLocal(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ v:1, settings:state.settings, parts:state.parts, days:state.days, _mt:state._mt })); } catch(e) {}
+}
+function loadLocal(){
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    if (!s || !Array.isArray(s.parts)) return false;
+    state = { v:1, settings:{...DEFAULT_SETTINGS, ...(s.settings||{})}, parts:s.parts, days:s.days||{}, _mt:s._mt||{}, demo:false };
+    return true;
+  } catch(e) { return false; }
+}
+function days(){ return state.demo ? DEMO : state.days; }
+function findEx(id){
+  if (!exMap) { exMap = {}; for (const p of state.parts) for (const e of p.ex) exMap[e.id] = { ex:e, part:p }; }
+  return exMap[id];
+}
+function partColor(p){ return `var(--p-${p?.color || "arms"})`; }
+
+/* ---------- persistence: this device + private cloud backup ---------- */
+const dirty = new Set();
+let db = null, cloudUid = null, cloudState = "connecting", flushTimer = null, flushing = false;
+
+function markDirty(k){
+  state._mt[k] = Date.now();
+  if (k === "meta") exMap = null;
+  saveLocal();
+  dirty.add(k);
+  clearTimeout(flushTimer);
+  flushTimer = setTimeout(flush, 800);
+}
+function monthDays(mk){ const o = {}; for (const [k,v] of Object.entries(state.days)) if (k.startsWith(mk)) o[k] = v; return o; }
+async function flush(){
+  if (!db || !cloudUid || flushing) return;
+  flushing = true;
+  try {
+    let retries = 0;
+    while (dirty.size) {
+      const k = dirty.values().next().value;
+      dirty.delete(k);
+      const ref = db.doc(`data/users/${cloudUid}/${k === "meta" ? "meta" : "m-" + k}`);
+      const body = k === "meta"
+        ? { updatedAt: state._mt.meta || Date.now(), settings: state.settings, parts: state.parts }
+        : { updatedAt: state._mt[k] || Date.now(), days: monthDays(k) };
+      try { await ref.set(clone(body)); cloudState = "on"; }
+      catch(e) {
+        const code = e && e.code;
+        if (code === "unavailable" && retries < 2) { retries++; dirty.add(k); await sleep(1200 + Math.random()*1200); continue; }
+        dirty.add(k);
+        if (code === "quota_exceeded") toast("クラウドの保存容量がいっぱいです。端末には保存されています");
+        cloudState = "error";
+        setTimeout(flush, 15000);
+        break;
+      }
+    }
+  } finally { flushing = false; renderSync(); }
+}
+async function initCloud(){
+  try {
+    if (!window.claude || typeof window.claude.use !== "function") { cloudState = "off"; return; }
+    const [d, u] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    const id = u ? await u.id() : null;
+    if (!d || !id) { cloudState = "off"; return; }
+    db = d; cloudUid = id;
+    const snap = await db.collection(`data/users/${id}`).limit(1000).get();
+    const remote = {};
+    snap.docs.forEach(s => { if (s.exists) remote[s.id] = s.data(); });
+    let changed = false;
+    const rm = remote.meta;
+    if (rm && Array.isArray(rm.parts) && (rm.updatedAt||0) > (state._mt.meta||0)) {
+      state.settings = {...DEFAULT_SETTINGS, ...(rm.settings||{})};
+      state.parts = clone(rm.parts);
+      state._mt.meta = rm.updatedAt; exMap = null; changed = true;
+    } else if (state._mt.meta && (state._mt.meta > ((rm && rm.updatedAt)||0))) dirty.add("meta");
+    for (const [docId, data] of Object.entries(remote)) {
+      if (!docId.startsWith("m-")) continue;
+      const mk = docId.slice(2);
+      if ((data.updatedAt||0) > (state._mt[mk]||0)) {
+        for (const k of Object.keys(state.days)) if (k.startsWith(mk)) delete state.days[k];
+        Object.assign(state.days, clone(data.days||{}));
+        state._mt[mk] = data.updatedAt; changed = true;
+      }
+    }
+    for (const mk of Object.keys(state._mt)) {
+      if (mk === "meta") continue;
+      const r = remote["m-" + mk];
+      if (!r || state._mt[mk] > (r.updatedAt||0)) dirty.add(mk);
+    }
+    if (Object.keys(remote).length && state.demo) { state.demo = false; changed = true; }
+    cloudState = "on";
+    if (changed) { saveLocal(); render(); }
+    flush();
+  } catch(e) { cloudState = "error"; }
+  finally { if (cloudState === "connecting") cloudState = "off"; renderSync(); }
+}
+
+/* demo data: shown only until the first real entry, never saved */
+function exitDemo(){
+  if (!state.demo) return;
+  if (cloudState === "connecting" && !hadLocal) { toast("保存データを読み込み中です。少し待ってからもう一度どうぞ"); throw new Error("wait"); }
+  state.demo = false;
+  markDirty("meta");
+  toast("サンプルを消しました。ここから記録できます");
+}
+function makeDemo(){
+  const D = {};
+  const idOf = n => { for (const p of state.parts) for (const e of p.ex) if (e.name === n) return e.id; return null; };
+  const SPL = [
+    [["ベンチプレス",60,[10,8,8,6]],["インクラインダンベルプレス",22,[10,10,8]],["ダンベルフライ",14,[12,12,10]]],
+    [["ラットプルダウン",50,[12,10,10,8]],["シーテッドロー",55,[10,10,8]],["ベントオーバーロー",50,[10,8,8]]],
+    [["スクワット",80,[8,8,6,6]],["レッグプレス",140,[12,10,10]],["レッグカール",35,[12,12,10]]],
+    [["ダンベルショルダープレス",24,[10,8,8]],["サイドレイズ",10,[15,12,10]],["マシンサイドレイズ",20,[12,10,8]],["バーベルカール",30,[10,10,8]]]
+  ];
+  const t = todayK(); let si = 0;
+  for (let i = 41; i >= 1; i--) {
+    const k = addDays(t, -i), dow = parseK(k).getDay(), prog = (41 - i) / 41;
+    if ([1,2,4,6].includes(dow)) {
+      const sp = SPL[si++ % 4];
+      D[k] = { demo:true, w: sp.map(([n, base, reps]) => ({ ex:idOf(n), sets: reps.map((r, j) => ({ w: Math.round(base*(1+0.07*prog)/2.5)*2.5, r: r - (Math.sin(i*3+j) > 0.6 ? 1 : 0) })) })).filter(w => w.ex) };
+    }
+    if (i % 3 === 0) {
+      D[k] = D[k] || { demo:true, w:[] };
+      D[k].b = { wt: round1(73.2 - 1.4*prog + Math.sin(i)*0.3), fat: round1(19.8 - 1.1*prog + Math.cos(i)*0.2), mus: round1(55.1 + 0.4*prog), waist: round1(82 - 1.2*prog) };
+    }
+  }
+  return D;
+}
+
+/* ---------- training math ---------- */
+const LB = 0.45359237;
+const FORMULAS = {
+  o40:    { name:"標準　重量×(1＋回数÷40)", f:(w,r) => w*(1+r/40),  inv:(m,r) => m/(1+r/40),  reps:p => 40*(1/p-1) },
+  epley:  { name:"Epley　重量×(1＋回数÷30)", f:(w,r) => w*(1+r/30), inv:(m,r) => m/(1+r/30), reps:p => 30*(1/p-1) },
+  brzycki:{ name:"Brzycki　重量×36÷(37−回数)", f:(w,r) => r < 37 ? w*36/(37-r) : 0, inv:(m,r) => m*(37-r)/36, reps:p => 37-36*p }
+};
+const fm = () => FORMULAS[state.settings.formula] || FORMULAS.o40;
+function rm(w, r){ w = +w; r = +r; if (!(w > 0) || !(r > 0)) return 0; if (r === 1) return w; return fm().f(w, r); }
+function weightFor(m, r){ return r === 1 ? m : fm().inv(m, r); }
+const U = () => state.settings.unit;
+const toD = kg => U() === "kg" ? kg : kg / LB;
+const fromD = v => U() === "kg" ? v : v * LB;
+function fmtW(kg){ if (!(kg > 0)) return "—"; return round1(toD(kg)).toLocaleString("ja-JP", {maximumFractionDigits:1}); }
+function fmtVol(kg, withUnit = true){
+  const v = toD(kg || 0);
+  if (U() === "kg" && v >= 1000) return `${(v/1000).toLocaleString("ja-JP",{maximumFractionDigits:2, minimumFractionDigits:2})}${withUnit ? "<small>t</small>" : ""}`;
+  return `${Math.round(v).toLocaleString("ja-JP")}${withUnit ? `<small>${U()}</small>` : ""}`;
+}
+const isCardioEx = id => { const f = findEx(id); return !!f && f.part.kind === "cardio"; };
+const validSet = (s, cardio) => cardio ? (s.min > 0 || s.km > 0) : (s.r > 0 || (s.a && s.ar > 0));
+const totalReps = s => (+s.r || 0) + (s.a ? (+s.ar || 0) : 0);
+const nonEmpty = s => (s.sub && s.sub.length) || s.w > 0 || s.r > 0 || s.ar > 0 || s.min > 0 || s.km > 0 || s.feel || (s.tags && s.tags.length) || (s.m && s.m.trim());
+
+function dayStats(d, partId){
+  const o = { ex:0, sets:0, reps:0, vol:0, maxRm:0, min:0, km:0, parts:new Set() };
+  if (!d) return o;
+  for (const w of d.w || []) {
+    const f = findEx(w.ex); if (!f) continue;
+    if (partId && f.part.id !== partId) continue;
+    const cardio = f.part.kind === "cardio";
+    const v = w.sets.filter(s => validSet(s, cardio));
+    if (!v.length) continue;
+    o.ex++; o.sets += v.length; o.parts.add(f.part);
+    for (const s of v) {
+      if (cardio) { o.min += +s.min || 0; o.km += +s.km || 0; }
+      else { o.reps += totalReps(s) + subReps(s); o.vol += (+s.w || 0) * totalReps(s) + subVol(s); o.maxRm = Math.max(o.maxRm, rm(s.w, s.r)); }
+    }
+  }
+  return o;
+}
+const keysAsc = () => Object.keys(days()).sort();
+function trainedKeys(partId){ return keysAsc().filter(k => dayStats(days()[k], partId).ex > 0); }
+function volBetween(from, to){ let s = 0; for (const [k, d] of Object.entries(days())) if (k >= from && k <= to) s += dayStats(d).vol; return s; }
+function lastSession(exId, before){
+  const ks = keysAsc().reverse();
+  for (const k of ks) {
+    if (before && k >= before) continue;
+    const w = (days()[k].w || []).find(w => w.ex === exId);
+    if (w) { const c = isCardioEx(exId); const v = w.sets.filter(s => validSet(s, c)); if (v.length) return { k, sets:v }; }
+  }
+  return null;
+}
+function sessions(exId){
+  const out = []; const c = isCardioEx(exId);
+  for (const k of keysAsc()) {
+    const w = (days()[k].w || []).find(w => w.ex === exId);
+    if (!w) continue;
+    const v = w.sets.filter(s => validSet(s, c));
+    if (v.length) out.push({ k, sets:v });
+  }
+  return out;
+}
+function bests(exId){
+  let bRm = { v:0 }, bW = { v:0 };
+  for (const s of sessions(exId)) for (const x of s.sets) {
+    const r = rm(x.w, x.r);
+    if (r > bRm.v) bRm = { v:r, k:s.k, w:x.w, r:x.r };
+    if ((+x.w||0) > bW.v) bW = { v:+x.w, k:s.k, r:x.r };
+  }
+  return { rm:bRm, w:bW };
+}
+function lastPartDate(p){
+  const ks = keysAsc().reverse();
+  for (const k of ks) if (dayStats(days()[k], p.id).ex) return k;
+  return null;
+}
+
+
+/* exercise type: compound / isolation */
+const DEFAULT_TYPE = {};
+"ベンチプレス,インクラインダンベルプレス,インクラインプレス,デクラインチェストプレス,チェストプレス,ディップス,デッドリフト,ラットプルダウン,シーテッドロー,ベントオーバーロー,Tバーロウ,ワンハンドロー,懸垂,スクワット,ブルガリアンスクワット,ハックスクワット,レッグプレス,ダンベルショルダープレス,ショルダープレス,アップライトロー,ナローベンチプレス".split(",").forEach(n => DEFAULT_TYPE[n] = "c");
+"ダンベルフライ,ペックフライ,レッグエクステンション,レッグカール,カーフレイズ,サイドレイズ,マシンサイドレイズ,リアレイズ,バーベルカール,ダンベルカール,ハンマーカール,トライセプスプッシュダウン,フレンチプレス,クランチ,レッグレイズ,アブローラー,ケーブルクランチ".split(",").forEach(n => DEFAULT_TYPE[n] = "i");
+const typeOf = e => e.type === "n" ? null : (e.type || DEFAULT_TYPE[e.name] || null);
+const TYPE_LABEL = { c:"COMPOUND", i:"ISOLATION" };
+const typeBadge = e => { const t = typeOf(e); return t ? `<span class="xt ${t}">${TYPE_LABEL[t]}</span>` : ""; };
+/* ---------- mutation helpers ---------- */
+function mutDay(k){ exitDemo(); if (!state.days[k]) state.days[k] = { w:[] }; if (!state.days[k].w) state.days[k].w = []; return state.days[k]; }
+function commitDay(k){
+  const d = state.days[k];
+  if (d) {
+    if (d.b && !Object.values(d.b).some(v => v !== null && v !== "" && v !== undefined)) delete d.b;
+    if (!(d.w && d.w.length) && !d.b) delete state.days[k];
+  }
+  markDirty(k.slice(0, 7));
+}
+function getW(k, exId){ const d = days()[k]; return d && (d.w || []).find(w => w.ex === exId); }
+function mutW(k, exId){ const d = mutDay(k); let w = d.w.find(w => w.ex === exId); if (!w) { w = { ex:exId, sets:[{}] }; d.w.push(w); } return w; }
+function cleanupEx(k, exId){
+  if (state.demo) return;
+  const d = state.days[k]; if (!d || !d.w) return;
+  const i = d.w.findIndex(w => w.ex === exId); if (i < 0) return;
+  const w = d.w[i], before = w.sets.length;
+  if (w.grp) return;
+  w.sets = w.sets.filter(nonEmpty);
+  if (!w.sets.length) d.w.splice(i, 1);
+  if (w.sets.length !== before || !w.sets.length) commitDay(k);
+}
+
+/* ---------- navigation ---------- */
+let view = { name:"home" }, stack = [], armed = null;
+const ui = {
+  homeMonth: todayK().slice(0,7), pickEdit:false, pickQ:"",
+  histPart:"", histMode:"graph", histRange:90, histEx:null, histMonth: todayK().slice(0,7),
+  bodyDate: todayK(), bodyMetric:"wt", bodyRange:90,
+  rmMode:"wr", rmW:60, rmR:8, rmOne:100, rmBase:{}, rmqOpen:true, importData:null, exportText:null
+};
+function leaveView(to){ if (view.name === "ex") { cleanupEx(view.date, view.ex); condOpen.clear(); } if (view.name === "grp" && to !== "pick" && to !== "ex") cleanupGrp(view.date, view.grp); }
+function go(name, params = {}, push = true){ leaveView(name); if (push) stack.push(view); view = { name, ...params }; armed = null; render(true); }
+function back(){ leaveView(stack.length ? stack[stack.length-1].name : "home"); view = stack.pop() || { name:"home" }; armed = null; render(true); }
+function tab(name){ leaveView(); stack = []; view = { name }; armed = null; render(true); }
+
+/* ---------- charts ---------- */
+let charts = {}, chartSeq = 0;
+function niceTicks(lo, hi, n = 4){
+  if (lo === hi) { const pad = Math.abs(lo) * 0.1 || 1; lo -= pad; hi += pad; }
+  const span = hi - lo; let step = Math.pow(10, Math.floor(Math.log10(span / n)));
+  const e = span / n / step; step *= e >= 7.5 ? 10 : e >= 3.5 ? 5 : e >= 1.5 ? 2 : 1;
+  const a = Math.floor(lo / step) * step, b = Math.ceil(hi / step) * step, t = [];
+  for (let v = a; v <= b + step / 2; v += step) t.push(+v.toFixed(6));
+  return t;
+}
+function lineChart(pts, opt = {}){
+  if (pts.length < 2) return `<div class="chart-empty">${pts.length ? "記録が2日分たまるとグラフになります" : "この期間の記録はまだありません"}</div>`;
+  const id = "c" + (++chartSeq), W = 340, H = opt.h || 176, L = 42, R = 30, T = 22, B = 24;
+  const t0 = parseK(pts[0].k).getTime(), t1 = parseK(pts[pts.length-1].k).getTime();
+  const ticks = niceTicks(Math.min(...pts.map(p => p.y)), Math.max(...pts.map(p => p.y)));
+  const y0 = ticks[0], y1 = ticks[ticks.length-1];
+  const X = t => L + (t1 === t0 ? (W-L-R)/2 : (t - t0) / (t1 - t0) * (W - L - R));
+  const Y = v => T + (1 - (v - y0) / (y1 - y0 || 1)) * (H - T - B);
+  const P = pts.map(p => ({ ...p, x:X(parseK(p.k).getTime()), yy:Y(p.y) }));
+  const tick = opt.tick || (v => v.toLocaleString("ja-JP"));
+  const fmt = opt.fmt || (v => v.toLocaleString("ja-JP"));
+  let g = ticks.map(v => `<line class="grid" x1="${L}" x2="${W-R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="axis" x="${L-6}" y="${(Y(v)+4).toFixed(1)}" text-anchor="end">${tick(v)}</text>`).join("");
+  const xl = [P[0], P[P.length-1]]; if (P.length > 4) xl.splice(1, 0, P[Math.floor(P.length/2)]);
+  g += xl.map((p, i) => `<text class="axis" x="${p.x.toFixed(1)}" y="${H-6}" text-anchor="${i === 0 ? "start" : i === xl.length-1 ? "end" : "middle"}">${fmtMD(p.k)}</text>`).join("");
+  const d = "M" + P.map(p => `${p.x.toFixed(1)},${p.yy.toFixed(1)}`).join("L");
+  const area = `${d}L${P[P.length-1].x.toFixed(1)},${H-B}L${P[0].x.toFixed(1)},${H-B}Z`;
+  const dots = P.length <= 45 ? P.map(p => `<circle class="pt" cx="${p.x.toFixed(1)}" cy="${p.yy.toFixed(1)}" r="3.5"/>`).join("") : "";
+  const e = P[P.length-1];
+  const end = `<circle class="pt end" cx="${e.x.toFixed(1)}" cy="${e.yy.toFixed(1)}" r="5"/><text class="endlbl" x="${e.x.toFixed(1)}" y="${(e.yy-10).toFixed(1)}" text-anchor="end">${fmt(e.y)}</text>`;
+  charts[id] = { P, fmt };
+  return `<div class="chart" data-chart="${id}"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.label || "推移グラフ")}">${g}<path class="area" d="${area}"/><path class="line" d="${d}"/>${dots}${end}<line class="guide" x1="0" x2="0" y1="${T}" y2="${H-B}" visibility="hidden"/><circle class="hi" r="5.5" cx="0" cy="0" visibility="hidden"/></svg><div class="tip" hidden></div></div>`;
+}
+function bindCharts(){
+  document.querySelectorAll(".chart[data-chart]").forEach(el => {
+    const c = charts[el.dataset.chart]; if (!c) return;
+    const svg = el.querySelector("svg"), tip = el.querySelector(".tip"), gl = svg.querySelector(".guide"), hi = svg.querySelector(".hi");
+    const W = svg.viewBox.baseVal.width;
+    const show = e => {
+      const r = svg.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * W;
+      let b = c.P[0]; for (const p of c.P) if (Math.abs(p.x - vx) < Math.abs(b.x - vx)) b = p;
+      gl.setAttribute("x1", b.x); gl.setAttribute("x2", b.x); gl.setAttribute("visibility", "visible");
+      hi.setAttribute("cx", b.x); hi.setAttribute("cy", b.yy); hi.setAttribute("visibility", "visible");
+      tip.hidden = false; tip.innerHTML = `<span>${fmtDate(b.k)}</span><b>${c.fmt(b.y)}</b>`;
+      const px = b.x / W * r.width, half = tip.offsetWidth / 2;
+      tip.style.left = Math.min(Math.max(px, half), r.width - half) + "px";
+    };
+    const hide = () => { gl.setAttribute("visibility", "hidden"); hi.setAttribute("visibility", "hidden"); tip.hidden = true; };
+    svg.addEventListener("pointermove", show); svg.addEventListener("pointerdown", show); svg.addEventListener("pointerleave", hide);
+  });
+}
+
+/* ---------- rest timer ---------- */
+const timer = { end:0, total:0, id:null, fin:false, hideAt:0 };
+let actx = null, wake = null;
+function ensureAudio(){ try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch(e) {} }
+function beep(){
+  if (!actx) return;
+  try { [0, .28, .56].forEach(t => { const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 880; o.connect(g); g.connect(actx.destination); g.gain.setValueAtTime(.001, actx.currentTime + t); g.gain.exponentialRampToValueAtTime(.35, actx.currentTime + t + .02); g.gain.exponentialRampToValueAtTime(.001, actx.currentTime + t + .22); o.start(actx.currentTime + t); o.stop(actx.currentTime + t + .25); }); } catch(e) {}
+}
+function startRest(sec){
+  ensureAudio();
+  timer.total = sec; timer.end = Date.now() + sec*1000; timer.fin = false;
+  clearInterval(timer.id); timer.id = setInterval(tickTimer, 250); tickTimer();
+  try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => wake = l).catch(() => {}); } catch(e) {}
+}
+function stopRest(){ clearInterval(timer.id); timer.id = null; $("#timerbar").hidden = true; try { wake && wake.release(); } catch(e) {} wake = null; }
+function tickTimer(){
+  const bar = $("#timerbar"), left = Math.max(0, timer.end - Date.now());
+  if (left <= 0 && !timer.fin) { timer.fin = true; timer.hideAt = Date.now() + 10000; beep(); try { navigator.vibrate && navigator.vibrate([250,120,250]); } catch(e) {} }
+  if (timer.fin && Date.now() > timer.hideAt) return stopRest();
+  const s = Math.ceil(left / 1000);
+  bar.hidden = false; bar.className = timer.fin ? "fin" : "";
+  bar.innerHTML = timer.fin
+    ? `<span class="t num">0:00</span><span class="lbl">休憩終了。次のセットへ</span><button data-act="timerStop">閉じる</button>`
+    : `<span class="t num">${Math.floor(s/60)}:${pad(s%60)}</span><span class="lbl">休憩中</span><button data-act="timerAdd">＋15秒</button><button data-act="timerStop">終了</button><span class="prog" style="width:${(1 - left/(timer.total*1000))*100}%"></span>`;
+}
+
+/* ---------- toast ---------- */
+let toastT = null;
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
+
+/* ---------- views ---------- */
+function header(){
+  const backBtn = `<button class="hbtn" data-act="back" aria-label="戻る">${ic("left")}</button>`;
+  const gear = `<button class="hbtn hright" data-act="settings" aria-label="設定">${ic("sliders")}</button>`;
+  const unitSeg = `<div class="seg hright" role="group" aria-label="重さの単位"><button data-act="unit" data-u="kg" aria-pressed="${U()==="kg"}">kg</button><button data-act="unit" data-u="lbs" aria-pressed="${U()==="lbs"}">lbs</button></div>`;
+  switch (view.name) {
+    case "home": return `<span class="brand"><svg class="logo" role="img" aria-label="REP." viewBox="0 0 254 100"><defs><clipPath id="repclip"><rect x="-20" y="0" width="300" height="100"/></clipPath></defs><g fill="none" stroke="currentColor" stroke-width="14" stroke-linejoin="miter" stroke-miterlimit="4" clip-path="url(#repclip)"><path d="M7 -10V110 M26.0 39.0L65.39 32.05 M27.05 8.11L65.39 32.05L37.55 67.67L73.88 104"/><path transform="translate(88 0)" d="M7 -10V110 M0 7H56 M7 50H50 M0 93H56"/><path transform="translate(156 0)" d="M7 -10V110 M26.0 39.0L65.39 32.05 M27.05 8.11L65.39 32.05L37.55 67.67"/></g><rect x="240" y="86" width="14" height="14" fill="var(--accent)"/></svg></span><span></span>${gear}`;
+    case "day": return `${backBtn}<h1>トレーニング記録</h1><span></span>`;
+    case "grp": { const ms = groupOf(days()[view.date], view.grp); return `${backBtn}<h1>${ms.length ? METHODS[methodOf(ms[0])].full : "セット"}</h1><span></span>`; }
+    case "pick": return `${backBtn}<h1>${view.addTo ? "種目を追加" : "種目を選ぶ"}</h1><button class="btn sm hright" data-act="pickEdit">${ui.pickEdit ? "完了" : "編集"}</button>`;
+    case "ex": { const f = findEx(view.ex); return `${backBtn}<h1>${esc(f ? f.ex.name : "")}</h1>${f && f.part.kind === "cardio" ? "<span></span>" : unitSeg}`; }
+    case "hist": return `<span></span><h1>履歴・分析</h1>${gear}`;
+    case "body": return `<span></span><h1>体組成</h1>${gear}`;
+    case "rm": return `<span></span><h1>RM換算</h1>${gear}`;
+    case "settings": return `${backBtn}<h1>設定</h1><span></span>`;
+  }
+  return "";
+}
+function tabsHtml(){
+  const cur = ["home","day","pick","ex","grp"].includes(view.name) ? "home" : view.name;
+  const T = [["home","ホーム","home"],["hist","履歴・分析","chart"],["body","体組成","scale"],["rm","RM換算","dumbbell"]];
+  return T.map(([k, l, i]) => `<button data-act="tab" data-t="${k}" aria-current="${cur === k}">${ic(i)}<span>${l}</span></button>`).join("");
+}
+function demoBanner(){
+  return state.demo ? `<div class="banner"><span>サンプルデータを表示しています。最初の記録を入れると自動で消えます。</span><button class="btn sm" data-act="hideDemo">サンプルを消す</button></div>` : "";
+}
+function monthGrid(ym, cellFn){
+  const [y, m] = ym.split("-").map(Number);
+  const first = new Date(y, m-1, 1), start = new Date(first); start.setDate(1 - first.getDay());
+  const lastDay = new Date(y, m, 0).getDate();
+  const rows = Math.ceil((first.getDay() + lastDay) / 7);
+  let h = WD.map(w => `<div class="cal-wd">${w}</div>`).join("");
+  for (let i = 0; i < rows*7; i++) { const d = new Date(start); d.setDate(start.getDate()+i); h += cellFn(keyOf(d), d.getMonth() === m-1); }
+  return `<div class="cal-grid">${h}</div>`;
+}
+const ymLabel = ym => { const [y, m] = ym.split("-"); return `${+m}月<small>${y}</small>`; };
+const shiftYM = (ym, n) => { const [y, m] = ym.split("-").map(Number); const d = new Date(y, m-1+n, 1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
+
+function vHome(){
+  const t = todayK(), D = days();
+  const cal = monthGrid(ui.homeMonth, (k, inM) => {
+    const st = dayStats(D[k]);
+    const dots = [...st.parts].slice(0, 3).map(p => `<span class="dot" style="--c:${partColor(p)}"></span>`).join("");
+    return `<button class="cal-day${inM ? "" : " out"}${st.ex ? " on" : ""}${k === t ? " today" : ""}" data-act="openDay" data-k="${k}" aria-label="${fmtDate(k)}${st.ex ? " 記録あり" : ""}"><span>${parseK(k).getDate()}</span><span class="cal-dots">${dots}</span></button>`;
+  });
+  const all = trainedKeys();
+  const monthDaysN = all.filter(k => k.startsWith(ui.homeMonth)).length;
+  const v7 = volBetween(addDays(t, -6), t), v28 = volBetween(addDays(t, -27), t);
+  let vAll = 0; for (const d of Object.values(D)) vAll += dayStats(d).vol;
+  const ws = addDays(t, -parseK(t).getDay());
+  const weeks = [0,1,2,3,4,5].map(i => { const s = addDays(ws, -7*i); return { l: i ? `${i}週前` : "今週", v: volBetween(s, addDays(s, 6)), cur: !i }; });
+  const maxW = Math.max(...weeks.map(w => w.v), 1);
+  const td = D[t], tst = dayStats(td);
+  const todayList = tst.ex ? blocks((td.w || []).filter(w => findEx(w.ex))).map(b => b.grp ? gCard(t, b, false) : wCard(t, b.ws[0], false)).join("") : `<div class="card empty">今日の記録はまだありません。</div>`;
+  return `${demoBanner()}
+  <section class="card" aria-label="カレンダー">
+    <div class="cal-head"><button class="iconbtn" data-act="homeMonth" data-n="-1" aria-label="前の月">${ic("left")}</button><h2>${ymLabel(ui.homeMonth)}</h2><button class="iconbtn" data-act="homeMonth" data-n="1" aria-label="次の月">${ic("right")}</button></div>
+    ${cal}
+    <div class="cal-foot"><span>この月<b>${monthDaysN}</b>日</span><span>累計<b>${all.length}</b>日</span></div>
+  </section>
+  <button class="btn primary big" data-act="openDay" data-k="${t}">${ic("plus")}今日のトレーニングを記録</button>
+  <section class="card" aria-label="負荷量">
+    <div class="sec-title"><span>合計負荷量（重さ×回数）</span></div>
+    <div class="figs"><div class="fig"><span>直近7日</span><b>${fmtVol(v7)}</b></div><div class="fig"><span>直近28日</span><b>${fmtVol(v28)}</b></div><div class="fig"><span>累計</span><b>${fmtVol(vAll)}</b></div></div>
+    <div class="weeks">${weeks.map(w => `<span class="lbl">${w.l}</span><div class="trk"><div class="bar${w.cur ? " cur" : ""}" style="width:${w.v/maxW*100}%"></div></div><span class="val">${w.v ? fmtVol(w.v) : "—"}</span>`).join("")}</div>
+  </section>
+  <div class="sec-title"><span>今日のトレーニング</span><span>${fmtDate(t)}</span></div>
+  ${todayList}`;
+}
+
+function setLine(s, cardio){
+  if (cardio) return `<span class="v">${s.min ? `${trimNum(s.min,1)}<small>分</small>` : ""}${s.km ? ` ${trimNum(s.km,2)}<small>km</small>` : ""}</span><span></span><span></span>`;
+  return `<span class="v">${s.w > 0 ? `${fmtW(s.w)}<small>${U()}</small>` : `<small>自重</small>`}</span><span class="v">× ${s.r || 0}<small>回</small>${s.a ? `<span class="tag">補助${s.ar ? "＋" + s.ar + "回" : ""}</span>` : ""}</span><span class="rmv">${s.w > 0 ? `RM ${fmtW(rm(s.w, s.r))}` : ""}</span>`;
+}
+function wCard(k, w, tools, i, n, letter){
+  const f = findEx(w.ex); const cardio = f.part.kind === "cardio";
+  const v = w.sets.filter(s => validSet(s, cardio));
+  const best = cardio ? 0 : Math.max(0, ...v.map(s => rm(s.w, s.r)));
+  const wm = methodOf(w);
+  const sets = v.length ? v.map((s, j) => `<span class="n">${j+1}</span>${setLine(s, cardio)}${s.sub && s.sub.length ? `<span class="note subl">${mic(wm === "drop" ? "drop" : "restpause")}${s.sub.map(x => `${fmtW(x.w)}${U()}×${x.r || 0}`).join("　")}</span>` : ""}${(s.feel || condSummary(s)) ? `<span class="note">${effBadge(s.feel)}${esc(condSummary(s))}</span>` : ""}`).join("") : `<span class="n"></span><span class="muted small" style="grid-column:2/-1">まだセットがありません</span>`;
+  const delKey = `delW:${w.ex}`;
+  const toolsH = tools ? `<button class="iconbtn" data-act="moveW" data-i="${i}" data-d="-1" aria-label="上へ" ${i === 0 ? "disabled" : ""}>${ic("up")}</button><button class="iconbtn" data-act="moveW" data-i="${i}" data-d="1" aria-label="下へ" ${i === n-1 ? "disabled" : ""}>${ic("down")}</button>${armed === delKey ? `<button class="armed" data-act="delW" data-ex="${w.ex}">削除する</button>` : `<button class="iconbtn" data-act="arm" data-key="${delKey}" aria-label="この種目を削除">${ic("trash")}</button>`}` : "";
+  const op = w.grp ? `data-act="openGrp" data-k="${k}" data-g="${w.grp}"` : `data-act="openEx" data-k="${k}" data-ex="${w.ex}"`;
+  return `<article class="wcard${letter ? " inner" : ""}"><div class="whead" style="--c:${partColor(f.part)}">${letter ? `<span class="gl num">${letter}</span>` : ""}<button class="name" ${op}><span>${esc(f.ex.name)}</span><small>${esc(f.part.name)}${!w.grp && wm !== "straight" ? ` ・ ${mBadge(wm)}` : ""}${best ? ` ・ 最高RM ${fmtW(best)}${U()}` : ""}</small></button>${toolsH}</div><button class="wsets" ${op}>${sets}</button></article>`;
+}
+
+function vDay(){
+  const k = view.date, d = days()[k], st = dayStats(d);
+  const ws = (d && d.w || []).filter(w => findEx(w.ex));
+  return `${demoBanner()}
+  <div class="daynav"><button class="iconbtn" data-act="dayShift" data-n="-1" aria-label="前の日">${ic("left")}</button><h2>${fmtDate(k)}${k === todayK() ? " ・今日" : ""}</h2><button class="iconbtn" data-act="dayShift" data-n="1" aria-label="次の日">${ic("right")}</button></div>
+  <div class="tiles"><div class="tile"><span>種目</span><b>${st.ex}</b></div><div class="tile"><span>セット</span><b>${st.sets}</b></div><div class="tile"><span>レップ</span><b>${st.reps}</b></div><div class="tile"><span>負荷量</span><b>${fmtVol(st.vol)}</b></div></div>
+  ${ws.length ? blocks(ws).map((b, i, bl) => b.grp ? gCard(k, b, true, i, bl.length) : wCard(k, b.ws[0], true, i, bl.length)).join("") : `<div class="card empty">この日の記録はまだありません。<br>下のボタンから種目を追加してください。</div>`}
+  <button class="btn primary big" data-act="pick">${ic("plus")}種目を追加</button>`;
+}
+
+function vPick(){
+  const q = ui.pickQ.trim(), d = days()[view.date], inDay = new Set((d && d.w || []).map(w => w.ex));
+  const t = todayK();
+  const parts = state.parts.filter(p => !p.archived);
+  const secs = parts.map(p => {
+    const exs = p.ex.filter(e => !e.archived && (!q || e.name.includes(q)));
+    if (q && !exs.length) return "";
+    const lp = lastPartDate(p), since = lp ? (daysBetween(lp, t) === 0 ? "今日" : `${daysBetween(lp, t)}日前`) : "";
+    const rows = exs.map(e => {
+      if (ui.pickEdit) {
+        const key = `delEx:${e.id}`;
+        return `<div class="exrow t-${typeOf(e) || "n"}"><input class="tf grow" id="ren-${e.id}" data-bind="renEx" data-ex="${e.id}" value="${esc(e.name)}" aria-label="種目名">${p.kind === "cardio" ? "" : `<button class="xt-btn" data-act="exType" data-ex="${e.id}" aria-label="種目の種類を切り替える">${typeBadge(e) || `<span class="xt n">TYPE</span>`}</button>`}${armed === key ? `<button class="armed" data-act="delEx" data-p="${p.id}" data-ex="${e.id}">削除する</button>` : `<button class="iconbtn" data-act="arm" data-key="${key}" aria-label="${esc(e.name)}を削除">${ic("trash")}</button>`}</div>`;
+      }
+      const ls = lastSession(e.id);
+      return `<div class="exrow t-${typeOf(e) || "n"}"><button class="go" data-act="pickEx" data-ex="${e.id}"><span class="nm">${typeBadge(e)}<span>${esc(e.name)}</span></span>${inDay.has(e.id) ? `<small class="added">追加済み</small>` : ls ? `<small>前回 ${fmtMD(ls.k)}</small>` : ""}</button></div>`;
+    }).join("");
+    const head = ui.pickEdit
+      ? `<div class="part-h"><button class="swatch" style="--c:${partColor(p)}" data-act="partColor" data-p="${p.id}" aria-label="色を変える"></button><input class="tf grow" id="renp-${p.id}" data-bind="renPart" data-p="${p.id}" value="${esc(p.name)}" aria-label="部位名">${armed === "delPart:" + p.id ? `<button class="armed" data-act="delPart" data-p="${p.id}">部位を削除</button>` : `<button class="iconbtn" data-act="arm" data-key="delPart:${p.id}" aria-label="部位を削除">${ic("trash")}</button>`}</div>`
+      : `<div class="part-h"><span class="dot" style="--c:${partColor(p)}"></span><h3>${esc(p.name)}</h3><span class="since">${since ? `最後 ${since}` : ""}</span></div>`;
+    const add = q ? "" : `<form class="addrow" data-form="addEx" data-p="${p.id}"><input class="tf grow" id="newex-${p.id}" placeholder="${esc(p.name)}に種目を追加" aria-label="${esc(p.name)}に種目を追加"><button class="btn sm" type="submit">追加</button></form>`;
+    return `<section class="part">${head}${rows}${add}</section>`;
+  }).join("");
+  return `${demoBanner()}
+  ${view.addTo ? (() => { const ms = groupOf(days()[view.date], view.addTo); const m = ms.length ? methodOf(ms[0]) : "super"; return `<div class="banner">${mBadge(m)}<span>に追加する種目を選んでください</span></div>`; })() : ""}
+  <input class="tf" id="pickq" data-bind="pickQ" placeholder="種目を検索" value="${esc(ui.pickQ)}" aria-label="種目を検索">
+  ${ui.pickEdit ? `<form class="card row" data-form="addPart"><input class="tf grow" id="newpart" placeholder="新しい部位（例：前腕）" aria-label="新しい部位"><button class="btn sm primary" type="submit">部位を追加</button></form>` : ""}
+  <div class="xt-legend"><span><span class="xt c">COMPOUND</span>多関節種目</span><span><span class="xt i">ISOLATION</span>単関節種目</span>${ui.pickEdit ? `<span class="muted small">バッジを押すと種類を切り替え</span>` : ""}</div>
+  <div id="pickList" style="display:flex;flex-direction:column;gap:14px">${secs || `<div class="card empty">「${esc(q)}」に一致する種目はありません。</div>`}</div>`;
+}
+
+const FEEL = [null, "限界", "きつい", "ちょうど", "楽", "余裕"];
+// stored value: 1 = 限界 … 5 = 余裕 ; shown as effort level 1 (EASY) … 5 (MAX)
+const EFFORT = [null, "EASY", "MODERATE", "HARD", "VERY HARD", "MAX"];
+const lvOf = feel => 6 - feel;
+const effBars = lv => `<i class="bars" aria-hidden="true">${[1,2,3,4,5].map(n => `<b class="${n <= lv ? "on" : ""}" style="height:${2 + n*1.6}px"></b>`).join("")}</i>`;
+const effBadge = feel => feel ? `<span class="eff lv${lvOf(feel)}">${effBars(lvOf(feel))}${EFFORT[lvOf(feel)]}</span>` : "";
+const TAGS = ["好調","集中","フォーム良い","フォーム崩れ","疲労","張り","痛み","寝不足"];
+const condOpen = new Set();
+function condSummary(s){
+  const parts = [];
+  if (s.tags && s.tags.length) parts.push(s.tags.join("・"));
+  if (s.m && s.m.trim()) parts.push(s.m.trim());
+  return parts.join(" ／ ");
+}
+function exSetRows(k, exId){
+  const f = findEx(exId), cardio = f.part.kind === "cardio";
+  const w = getW(k, exId) || { sets:[{}] };
+  const ls = lastSession(exId, k);
+  return w.sets.map((s, i) => {
+    const prev = ls && ls.sets[i];
+    const doneBtn = `<button class="done-btn" data-act="doneSet" data-i="${i}" aria-pressed="${!!s.d}" aria-label="${i+1}セット目を完了">${ic("check")}</button>`;
+    const main = cardio
+      ? `<label class="fld"><input id="min-${i}" inputmode="decimal" data-bind="set" data-f="min" data-i="${i}" value="${trimNum(s.min,1)}" placeholder="${prev ? trimNum(prev.min,1) : "0"}" aria-label="${i+1}セット目の時間"><span>分</span></label><label class="fld"><input id="km-${i}" inputmode="decimal" data-bind="set" data-f="km" data-i="${i}" value="${trimNum(s.km,2)}" placeholder="${prev ? trimNum(prev.km,2) : "0"}" aria-label="${i+1}セット目の距離"><span>km</span></label>`
+      : `<label class="fld"><input id="w-${i}" inputmode="decimal" data-bind="set" data-f="w" data-i="${i}" value="${s.w > 0 ? trimNum(toD(s.w)) : ""}" class="${prev && prev.w > 0 ? "" : "ph-txt"}" placeholder="${prev && prev.w > 0 ? trimNum(toD(prev.w),1) : "WEIGHT"}" aria-label="${i+1}セット目の重さ"><span>${U()}</span></label><span class="x">×</span><label class="fld"><input id="r-${i}" inputmode="numeric" data-bind="set" data-f="r" data-i="${i}" value="${s.r || ""}" class="${prev && prev.r ? "" : "ph-txt"}" placeholder="${prev && prev.r ? prev.r : "REPS"}" aria-label="${i+1}セット目の自力の回数"><span>回</span></label>`;
+    const assist = cardio ? "" : `<div class="assist">
+        <span class="lbl">補助</span>
+        <div class="seg sm" role="group" aria-label="${i+1}セット目の補助"><button data-act="assistSet" data-i="${i}" data-v="0" aria-pressed="${!s.a}">なし</button><button data-act="assistSet" data-i="${i}" data-v="1" aria-pressed="${!!s.a}">あり</button></div>
+        ${s.a ? `<label class="fld ar"><span>＋</span><input id="ar-${i}" inputmode="numeric" data-bind="set" data-f="ar" data-i="${i}" value="${s.ar || ""}" placeholder="0" aria-label="${i+1}セット目の補助の回数"><span>回</span></label>` : `<span class="grow"></span>`}
+        <span class="rm num" id="rm-${i}">${rmText(s)}</span>
+      </div>`;
+    const open = condOpen.has(i);
+    const feel = `<div class="feel" role="group" aria-label="${i+1}セット目のエフォート">${[1,2,3,4,5].map(lv => `<button data-act="feelSet" data-i="${i}" data-v="${6-lv}" aria-pressed="${s.feel === 6-lv}" class="lv${lv}"><span>${EFFORT[lv]}</span></button>`).join("")}</div>`;
+    const nCond = (s.tags ? s.tags.length : 0) + (s.m && s.m.trim() ? 1 : 0);
+    const cond = `<div class="cond">
+        <div class="cond-h"><span class="lbl num eff-lbl">EFFORT</span>${feel}</div>
+        <button class="cond-t" data-act="condToggle" data-i="${i}" aria-expanded="${open}">${ic(open ? "up" : "down")}<span>体の状態・メモ</span>${!open && nCond ? `<em>${esc(condSummary({ tags:s.tags, m:s.m }))}</em>` : ""}</button>
+        ${open ? `<div class="cond-b"><div class="tagpick" role="group" aria-label="体の状態">${TAGS.map(t => `<button data-act="tagSet" data-i="${i}" data-t="${t}" aria-pressed="${!!(s.tags && s.tags.includes(t))}">${t}</button>`).join("")}</div><textarea class="tf memo2" id="m-${i}" data-bind="set" data-f="m" data-i="${i}" rows="2" placeholder="気分や体の感覚など（例：肩の前側に少し違和感）" aria-label="${i+1}セット目のメモ">${esc(s.m || "")}</textarea></div>` : ""}
+      </div>`;
+    const wm = methodOf(w);
+    const ascD = (wm === "asc" && i > 0 && s.w > 0 && w.sets[i-1] && w.sets[i-1].w > 0) ? `<span class="ascd num">${mic("asc")}${s.w >= w.sets[i-1].w ? "＋" : "−"}${trimNum(Math.abs(toD(s.w - w.sets[i-1].w)), 2)}${U()}</span>` : "";
+    const subs = (!cardio && (wm === "drop" || wm === "restpause")) ? `<div class="subs">${(s.sub || []).map((x, j) => `<div class="sub"><span class="sub-i">${mic(wm)}<small class="num">${wm === "drop" ? "DROP" : "PAUSE"} ${j+1}</small></span><label class="fld"><input id="sw-${i}-${j}" inputmode="decimal" data-bind="set" data-f="sw" data-i="${i}" data-j="${j}" value="${x.w > 0 ? trimNum(toD(x.w)) : ""}" class="ph-txt" placeholder="WEIGHT" aria-label="${i+1}セット目 ${j+1}回目の重さ"><span>${U()}</span></label><span class="x">×</span><label class="fld"><input id="sr-${i}-${j}" inputmode="numeric" data-bind="set" data-f="sr" data-i="${i}" data-j="${j}" value="${x.r || ""}" class="ph-txt" placeholder="REPS" aria-label="${i+1}セット目 ${j+1}回目の回数"><span>回</span></label><button class="mini" data-act="delSub" data-i="${i}" data-j="${j}" aria-label="削除">${ic("trash")}</button></div>`).join("")}<button class="addsub" data-act="addSub" data-i="${i}">${mic(wm)}<span class="num">${wm === "drop" ? `＋ DROP −${w.dropPct || 20}%` : `＋ PAUSE ${w.pause || 15}s`}</span><small>${wm === "drop" ? "重さを下げて続ける" : "休憩タイマーが始まります"}</small></button></div>` : "";
+    return `<div class="set${s.d ? " done" : ""}">
+      <div class="set-main"><span class="set-no num">${i+1}</span>${main}${doneBtn}</div>
+      ${ascD}
+      ${subs}
+      ${assist}
+      ${cond}
+      <div class="set-tools">${i > 0 ? `<button class="mini" data-act="sameSet" data-i="${i}">${ic("same")}前のセットと同じ</button>` : ""}<span class="grow"></span><button class="mini" data-act="delSet" data-i="${i}" aria-label="${i+1}セット目を削除">${ic("trash")}削除</button></div>
+    </div>`;
+  }).join("");
+}
+const rmText = s => (s.w > 0 && s.r > 0) ? `RM ${fmtW(rm(s.w, s.r))}` : "RM —";
+
+const RMQ_REPS = [1,2,3,4,5,6,8,10,12,15];
+function rmqBase(exId){ return ui.rmBase[exId] || bests(exId).rm.v || 0; }
+function rmqChips(exId){
+  const base = rmqBase(exId), step = state.settings.round;
+  if (!(base > 0)) return `<div class="rmq-empty">基準の1RMを入れると、回数ごとの目安重量が出ます</div>`;
+  return RMQ_REPS.map(r => { const kg = fromD(roundTo(toD(weightFor(base, r)), step)); return `<button class="rmq-c" data-act="rmPick" data-r="${r}" data-kg="${kg}" aria-label="${r}回 ${fmtW(kg)}${U()}を入力"><span class="r num">${r}<small>REP${r > 1 ? "S" : ""}</small></span><b class="num">${trimNum(round1(toD(kg)),2)}</b><span class="p num">${Math.round(weightFor(base, r)/base*100)}%</span></button>`; }).join("");
+}
+function rmQuick(exId){
+  const base = rmqBase(exId), isPB = !ui.rmBase[exId] && base > 0;
+  return `<section class="rmq">
+    <div class="rmq-h"><button class="rmq-t" data-act="rmqToggle" aria-expanded="${ui.rmqOpen}">${ic(ui.rmqOpen ? "up" : "down")}<span class="num">RM TABLE</span></button>
+      <label class="rmq-base"><span>${isPB ? "自己ベスト1RM" : "基準1RM"}</span><input id="rmqBase" class="num" inputmode="decimal" data-bind="rmqBase" value="${base > 0 ? trimNum(round1(toD(base)),1) : ""}" placeholder="—" aria-label="基準の1RM"><small>${U()}</small></label></div>
+    ${ui.rmqOpen ? `<div class="rmq-wrap"><div class="rmq-row" id="rmqChips">${rmqChips(exId)}</div></div><div class="rmq-foot"><div class="rmq-track" aria-hidden="true"><span id="rmqThumb"></span></div><span class="rmq-swipe num" id="rmqSwipe">SWIPE ${ic("right")}</span></div><div class="rmq-hint">タップすると、空いているセットに重さと回数が入ります</div>` : ""}
+  </section>`;
+}
+/* ---------- set methods ---------- */
+const MI = {
+  straight:'<path d="M3.5 12h16"/><path d="m14.5 7 5 5-5 5"/>',
+  super:'<path d="M4 8.5h14.5"/><path d="m15.5 5.5 3 3-3 3"/><path d="M20 15.5H5.5"/><path d="m8.5 12.5-3 3 3 3"/>',
+  tri:'<path d="M12 5.5 18.5 17.5h-13z"/><circle cx="12" cy="5.5" r="2.2" fill="currentColor" stroke="none"/><circle cx="18.5" cy="17.5" r="2.2" fill="currentColor" stroke="none"/><circle cx="5.5" cy="17.5" r="2.2" fill="currentColor" stroke="none"/>',
+  giant:'<path d="M19.5 12A7.5 7.5 0 1 1 17.3 6.7"/><path d="m14.2 6.4 3.1.3.2 3.1"/><circle cx="12" cy="4.5" r="1.9" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.9" fill="currentColor" stroke="none"/><circle cx="12" cy="19.5" r="1.9" fill="currentColor" stroke="none"/><circle cx="19.5" cy="12" r="1.9" fill="currentColor" stroke="none"/>',
+  restpause:'<path d="M3 12h3.5"/><path d="M9.5 8v8M13 8v8"/><path d="M16 12h4.5"/><path d="m18 9.3 2.7 2.7-2.7 2.7"/>',
+  drop:'<path d="M5.5 5.5 18 18"/><path d="M18.5 10.5v8h-8"/>',
+  asc:'<path d="M5.5 18.5 18 6"/><path d="M10.5 5.5h8v8"/>'
+};
+const METHODS = {
+  straight:{ en:"STRAIGHT", full:"STRAIGHT SET", ja:"ストレートセット", desc:"同じ重さのセットを、休憩をはさんで繰り返します。" },
+  super:{ en:"SUPER", full:"SUPER SET", ja:"スーパーセット", desc:"2種目を休まずに交互に行い、1周したら休憩します。", n:2, max:2, group:true },
+  tri:{ en:"TRI", full:"TRI SET", ja:"トライセット", desc:"3種目を休まずに続けて行い、1周したら休憩します。", n:3, max:3, group:true },
+  giant:{ en:"GIANT", full:"GIANT SET", ja:"ジャイアントセット", desc:"4種目以上を休まずに続けて行い、1周したら休憩します。", n:4, max:6, group:true },
+  restpause:{ en:"REST<br>PAUSE", full:"REST-PAUSE", ja:"レストポーズ", desc:"限界まで行ったら10〜20秒だけ休み、同じ重さで数回ずつ追加します。" },
+  drop:{ en:"DROP", full:"DROP SET", ja:"ドロップセット", desc:"限界まで行ったら休まずに重さを下げ、続けて追い込みます。" },
+  asc:{ en:"ASCEND", full:"ASCENDING SET", ja:"アセンディングセット", desc:"セットごとに重さを上げていきます。" }
+};
+const MORDER = ["straight","super","tri","giant","restpause","drop","asc"];
+const DROP_OPTS = [10,15,20,25,30,40], PAUSE_OPTS = [10,15,20,30,45], STEP_OPTS = [1,1.25,2.5,5,10];
+const LET = "ABCDEF";
+const mic = m => `<svg class="ic mi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${MI[m]}</svg>`;
+const methodOf = w => (w && METHODS[w.method]) ? w.method : "straight";
+const mBadge = m => `<span class="mb">${mic(m)}<span>${METHODS[m].full}</span></span>`;
+const subReps = s => (s.sub || []).reduce((a, x) => a + (+x.r || 0), 0);
+const subVol = s => (s.sub || []).reduce((a, x) => a + (+x.w || 0) * (+x.r || 0), 0);
+function fmtSet(s){
+  let t = `${fmtW(s.w)}×${s.r || 0}${s.a && s.ar ? "+" + s.ar : ""}`;
+  for (const x of s.sub || []) t += (x.w > 0 && Math.abs(x.w - (s.w || 0)) > 0.01) ? `→${fmtW(x.w)}×${x.r || 0}` : `→${x.r || 0}`;
+  return t;
+}
+function groupOf(d, grp){ return (d && d.w || []).filter(w => w.grp === grp && findEx(w.ex)); }
+function blocks(ws){
+  const out = [], seen = new Set();
+  for (const w of ws) {
+    if (w.grp) { if (seen.has(w.grp)) continue; seen.add(w.grp); out.push({ grp:w.grp, ws: ws.filter(x => x.grp === w.grp) }); }
+    else out.push({ ws:[w] });
+  }
+  return out;
+}
+function ungroupOne(k, w){
+  const grp = w.grp; delete w.grp; w.method = "straight";
+  const rest = groupOf(state.days[k], grp);
+  if (rest.length <= 1) rest.forEach(x => { delete x.grp; x.method = "straight"; });
+}
+function cleanupGrp(k, grp){
+  if (state.demo) return;
+  const d = state.days[k]; if (!d || !d.w) return;
+  const ms = groupOf(d, grp); if (!ms.length) return;
+  let R = Math.max(...ms.map(w => w.sets.length));
+  for (let r = R - 1; r >= 1; r--) if (ms.every(w => !w.sets[r] || !nonEmpty(w.sets[r]))) ms.forEach(w => { if (w.sets.length > r) w.sets.splice(r, 1); });
+  if (ms.every(w => !w.sets.some(nonEmpty))) d.w = d.w.filter(w => w.grp !== grp);
+  commitDay(k);
+}
+function paramCtl(key, label, help){
+  return `<div class="mp-param"><span>${help}</span><div class="mp-step"><button class="iconbtn" data-act="mParam" data-key="${key}" data-n="-1" aria-label="減らす">${ic("minus")}</button><b class="num">${label}</b><button class="iconbtn" data-act="mParam" data-key="${key}" data-n="1" aria-label="増やす">${ic("plus")}</button></div></div>`;
+}
+function methodPicker(w, groupOnly){
+  w = w || {};
+  const cur = methodOf(w), M = METHODS[cur];
+  const list = groupOnly ? MORDER.filter(m => METHODS[m].group) : MORDER;
+  let params = "";
+  if (cur === "drop") params = paramCtl("dropPct", `−${w.dropPct || 20}%`, "ドロップで下げる重さ");
+  if (cur === "restpause") params = paramCtl("pause", `${w.pause || 15}s`, "ポーズの休憩");
+  if (cur === "asc") params = paramCtl("step", `＋${trimNum(toD(w.step || 2.5), 2)}${U()}`, "1セットごとに上げる重さ");
+  return `<section class="mpick${groupOnly ? " g" : ""}">
+    <div class="mp-h"><span class="num">SET METHOD</span><span class="mp-ja">${M.ja}</span></div>
+    <div class="mp-row" role="radiogroup" aria-label="セット法">${list.map(m => `<button role="radio" aria-checked="${m === cur}" data-act="${groupOnly ? "setMethodG" : "setMethod"}" data-m="${m}" class="mp-b">${mic(m)}<span class="num">${METHODS[m].en}</span></button>`).join("")}</div>
+    <p class="mp-desc">${M.desc}</p>${params}
+  </section>`;
+}
+function gCard(k, b, tools, i, n){
+  const m = methodOf(b.ws[0]);
+  const R = Math.max(0, ...b.ws.map(w => w.sets.filter(nonEmpty).length));
+  const delKey = `delG:${b.grp}`;
+  const t = tools ? `<button class="iconbtn" data-act="moveW" data-i="${i}" data-d="-1" aria-label="上へ" ${i === 0 ? "disabled" : ""}>${ic("up")}</button><button class="iconbtn" data-act="moveW" data-i="${i}" data-d="1" aria-label="下へ" ${i === n-1 ? "disabled" : ""}>${ic("down")}</button>${armed === delKey ? `<button class="armed" data-act="delG" data-g="${b.grp}">削除する</button>` : `<button class="iconbtn" data-act="arm" data-key="${delKey}" aria-label="このセットを削除">${ic("trash")}</button>`}` : "";
+  return `<article class="gcard"><div class="ghead"><button class="gname" data-act="openGrp" data-k="${k}" data-g="${b.grp}">${mBadge(m)}<small>${b.ws.length}種目 ・ ${R}ラウンド</small></button>${t}</div><div class="gbody">${b.ws.map((w, mi) => wCard(k, w, false, 0, 0, LET[mi])).join("")}</div></article>`;
+}
+function vGrp(){
+  const k = view.date, d = days()[k], ms = groupOf(d, view.grp);
+  if (!ms.length) return `<div class="card empty">このセットは見つかりません。</div>`;
+  const m = methodOf(ms[0]), M = METHODS[m];
+  const R = Math.max(1, ...ms.map(w => w.sets.length));
+  const members = ms.map((w, mi) => { const f = findEx(w.ex); return `<div class="gm"><span class="gl num">${LET[mi]}</span><button class="gm-n" data-act="openEx" data-k="${k}" data-ex="${w.ex}"><span class="nm">${typeBadge(f.ex)}<span>${esc(f.ex.name)}</span></span><small>補助・EFFORT・メモ ›</small></button><button class="iconbtn" data-act="grpRemove" data-ex="${w.ex}" aria-label="${esc(f.ex.name)}をこのセットから外す">${ic("trash")}</button></div>`; }).join("");
+  let slots = "";
+  for (let i = ms.length; i < M.n; i++) slots += `<button class="gslot" data-act="grpAdd">${ic("plus")}<span class="gl num ghost">${LET[i]}</span>${i + 1}種目目を選ぶ</button>`;
+  if (ms.length >= M.n && ms.length < M.max) slots += `<button class="gslot" data-act="grpAdd">${ic("plus")}<span class="gl num ghost">${LET[ms.length]}</span>種目を追加</button>`;
+  const over = ms.length > M.max ? `<div class="banner">${M.full}は${M.max}種目です。多い種目を外すか、セット法を変えてください。</div>` : "";
+  const rounds = [];
+  for (let r = 0; r < R; r++) {
+    const done = ms.every(w => w.sets[r] && w.sets[r].d);
+    const rows = ms.map((w, mi) => {
+      const s = w.sets[r] || {}, f = findEx(w.ex), cardio = f.part.kind === "cardio", p = r > 0 ? w.sets[r-1] : null;
+      const inputs = cardio
+        ? `<label class="fld"><input id="g-${mi}-${r}-min" inputmode="decimal" data-bind="gset" data-ex="${w.ex}" data-r="${r}" data-f="min" value="${trimNum(s.min,1)}" class="ph-txt" placeholder="MIN" aria-label="${LET[mi]} ラウンド${r+1}の時間"><span>分</span></label>`
+        : `<label class="fld"><input id="g-${mi}-${r}-w" inputmode="decimal" data-bind="gset" data-ex="${w.ex}" data-r="${r}" data-f="w" value="${s.w > 0 ? trimNum(toD(s.w)) : ""}" class="${p && p.w > 0 ? "" : "ph-txt"}" placeholder="${p && p.w > 0 ? trimNum(toD(p.w),1) : "WEIGHT"}" aria-label="${LET[mi]} ${esc(f.ex.name)} ラウンド${r+1}の重さ"><span>${U()}</span></label><span class="x">×</span><label class="fld"><input id="g-${mi}-${r}-r" inputmode="numeric" data-bind="gset" data-ex="${w.ex}" data-r="${r}" data-f="r" value="${s.r || ""}" class="${p && p.r ? "" : "ph-txt"}" placeholder="${p && p.r ? p.r : "REPS"}" aria-label="${LET[mi]} ${esc(f.ex.name)} ラウンド${r+1}の回数"><span>回</span></label>`;
+      return `<div class="gr-row"><span class="gl num">${LET[mi]}</span><div class="gr-in"><small>${esc(f.ex.name)}</small><div class="gr-f">${inputs}</div></div></div>`;
+    }).join(`<div class="gr-link num" aria-hidden="true">${ic("down")}NO REST</div>`);
+    rounds.push(`<div class="round${done ? " done" : ""}"><div class="round-h"><span class="num">ROUND ${r+1}</span>${R > 1 ? `<button class="mini" data-act="grpDelRound" data-r="${r}" aria-label="ラウンド${r+1}を削除">${ic("trash")}</button>` : ""}<span class="grow"></span><button class="done-btn" data-act="grpDone" data-r="${r}" aria-pressed="${done}" aria-label="ラウンド${r+1}を完了">${ic("check")}</button></div>${rows}<div class="gr-rest num">${ic("timer")}REST ${state.settings.rest}s</div></div>`);
+  }
+  const rest = `<div class="rest"><button class="iconbtn" data-act="restAdj" data-n="-15" aria-label="休憩を15秒短く">${ic("minus")}</button><span class="sec num">${state.settings.rest}<small class="small muted">秒</small></span><button class="iconbtn" data-act="restAdj" data-n="15" aria-label="休憩を15秒長く">${ic("plus")}</button><button class="btn sm primary" data-act="restStart">${ic("timer")}休憩</button></div>`;
+  return `<div class="daynav"><span class="muted small">${fmtDate(k)}</span><button class="btn sm" data-act="grpUngroup">セットを解除</button></div>
+  ${methodPicker(ms[0], true)}
+  ${over}
+  <section class="gmembers">${members}${slots}</section>
+  ${rest}
+  <div class="rounds">${rounds.join("")}</div>
+  <button class="btn big" data-act="grpAddRound">${ic("plus")}ラウンドを追加</button>
+  <p class="small muted">各種目の補助・EFFORT・メモは、種目名を押すと入力できます。</p>`;
+}
+
+function vEx(){
+  const k = view.date, exId = view.ex, f = findEx(exId);
+  if (!f) return `<div class="card empty">この種目は見つかりません。</div>`;
+  const cardio = f.part.kind === "cardio";
+  const ls = lastSession(exId, k);
+  const b = bests(exId);
+  const pb = cardio ? "" : `<div class="pb"><div>自己ベストRM<b>${b.rm.v ? fmtW(b.rm.v) + U() : "—"}</b></div><div>最大重量<b>${b.w.v ? `${fmtW(b.w.v)}${U()}×${b.w.r}` : "—"}</b></div></div>`;
+  const rest = `<div class="rest"><button class="iconbtn" data-act="restAdj" data-n="-15" aria-label="休憩を15秒短く">${ic("minus")}</button><span class="sec num">${state.settings.rest}<small class="small muted">秒</small></span><button class="iconbtn" data-act="restAdj" data-n="15" aria-label="休憩を15秒長く">${ic("plus")}</button><button class="btn sm primary" data-act="restStart">${ic("timer")}休憩</button></div>`;
+  const last = ls ? `<div class="last"><div class="grow"><div class="when">前回 ${fmtDate(ls.k)}</div><div class="ls">${ls.sets.map((s, i) => cardio ? `<span>${i+1}) ${trimNum(s.min,1)}分 ${s.km ? trimNum(s.km,2)+"km" : ""}</span>` : `<span>${i+1}) ${fmtSet(s)}</span>`).join("")}</div></div><button class="btn sm" data-act="copyLast">${ic("copy")}コピー</button></div>` : "";
+  const hist = sessions(exId).filter(s => s.k !== k);
+  const pts = cardio ? [] : sessions(exId).map(s => ({ k:s.k, y: round1(toD(Math.max(...s.sets.map(x => rm(x.w, x.r))))) })).filter(p => p.y > 0).slice(-30);
+  return `${demoBanner()}
+  <div class="daynav"><span class="muted small">${esc(f.part.name)}${typeBadge(f.ex)}</span><span class="muted small">${fmtDate(k)}</span></div>
+  ${cardio ? "" : (() => { const w0 = getW(k, exId); return (w0 && w0.grp ? `<div class="gbanner">${mBadge(methodOf(w0))}<span>の一部です</span><button class="btn sm" data-act="openGrp" data-k="${k}" data-g="${w0.grp}">まとめて入力</button></div>` : "") + methodPicker(w0, false); })()}
+  <div class="extop">${pb}${rest}</div>
+  ${last}
+  ${cardio ? "" : rmQuick(exId)}
+  <div class="sets" id="sets">${exSetRows(k, exId)}</div>
+  <button class="btn big" data-act="addSet">${ic("plus")}セットを追加</button>
+  ${cardio ? "" : `<section class="card"><div class="sec-title" style="margin-bottom:8px"><span>推定1RMの推移（${U()}）</span></div>${lineChart(pts, { fmt:v => `${v}${U()}`, label:"推定1RMの推移" })}</section>`}
+  ${hist.length ? `<section class="card"><div class="sec-title" style="margin-bottom:4px"><span>過去の記録</span></div><div class="sess">${hist.slice(-8).reverse().map(s => `<button data-act="openDay" data-k="${s.k}"><span class="d">${fmtMD(s.k)}</span><span class="s">${s.sets.map(x => cardio ? `${trimNum(x.min,1)}分` : fmtSet(x)).join("　")}</span></button>`).join("")}</div></section>` : ""}`;
+}
+
+function vHist(){
+  const parts = state.parts.filter(p => !p.archived || trainedKeys(p.id).length);
+  const pSel = parts.find(p => p.id === ui.histPart);
+  const chips = `<div class="chips" role="group" aria-label="部位で絞り込み"><button class="chip" data-act="histPart" data-p="" aria-pressed="${!pSel}">すべて</button>${parts.map(p => `<button class="chip" data-act="histPart" data-p="${p.id}" aria-pressed="${pSel === p}"><span class="dot" style="--c:${partColor(p)}"></span>${esc(p.name)}</button>`).join("")}</div>`;
+  const modes = `<div class="seg" role="group" aria-label="表示の切り替え">${[["graph","グラフ"],["cal","カレンダー"],["ex","種目別"]].map(([m, l]) => `<button data-act="histMode" data-m="${m}" aria-pressed="${ui.histMode === m}">${l}</button>`).join("")}</div>`;
+  const ranges = `<div class="seg" role="group" aria-label="期間">${[[30,"1ヶ月"],[90,"3ヶ月"],[365,"1年"],[0,"全期間"]].map(([r, l]) => `<button data-act="histRange" data-r="${r}" aria-pressed="${ui.histRange === r}">${l}</button>`).join("")}</div>`;
+  let body = "";
+  const pid = pSel ? pSel.id : "";
+  if (ui.histMode === "graph") {
+    const from = ui.histRange ? addDays(todayK(), -ui.histRange + 1) : "0000";
+    const ks = trainedKeys(pid).filter(k => k >= from);
+    const cardio = pSel && pSel.kind === "cardio";
+    let tot = 0; ks.forEach(k => { const s = dayStats(days()[k], pid); tot += cardio ? s.min : s.vol; });
+    const summary = `<div class="figs" style="margin:0"><div class="fig"><span>トレーニング日数</span><b>${ks.length}<small>日</small></b></div><div class="fig"><span>${cardio ? "合計時間" : "合計負荷量"}</span><b>${cardio ? `${Math.round(tot)}<small>分</small>` : fmtVol(tot)}</b></div><div class="fig"><span>1回あたり</span><b>${ks.length ? (cardio ? `${Math.round(tot/ks.length)}<small>分</small>` : fmtVol(tot/ks.length)) : "—"}</b></div></div>`;
+    if (cardio) {
+      const p1 = ks.map(k => ({ k, y: round1(dayStats(days()[k], pid).min) }));
+      const p2 = ks.map(k => ({ k, y: round1(dayStats(days()[k], pid).km) })).filter(p => p.y > 0);
+      body = `${ranges}<section class="card">${summary}</section><section class="card"><div class="sec-title" style="margin-bottom:8px"><span>時間（分）</span></div>${lineChart(p1, { fmt:v => `${v}分` })}</section><section class="card"><div class="sec-title" style="margin-bottom:8px"><span>距離（km）</span></div>${lineChart(p2, { fmt:v => `${v}km` })}</section>`;
+    } else {
+      const p1 = ks.map(k => ({ k, y: Math.round(toD(dayStats(days()[k], pid).vol)) }));
+      const p2 = ks.map(k => ({ k, y: round1(toD(dayStats(days()[k], pid).maxRm)) })).filter(p => p.y > 0);
+      body = `${ranges}<section class="card">${summary}</section><section class="card"><div class="sec-title" style="margin-bottom:8px"><span>総負荷量（${U()}）</span></div>${lineChart(p1, { fmt:v => `${v.toLocaleString("ja-JP")}${U()}`, tick:v => v >= 10000 ? `${v/1000}k` : v.toLocaleString("ja-JP"), label:"総負荷量の推移" })}</section><section class="card"><div class="sec-title" style="margin-bottom:8px"><span>その日の最大RM（${U()}）</span></div>${lineChart(p2, { fmt:v => `${v}${U()}`, label:"最大RMの推移" })}</section>`;
+    }
+  } else if (ui.histMode === "cal") {
+    const D = days(); let max = 1;
+    const vols = {}; for (const k of Object.keys(D)) if (k.startsWith(ui.histMonth)) { vols[k] = dayStats(D[k], pid); max = Math.max(max, vols[k].vol); }
+    const grid = monthGrid(ui.histMonth, (k, inM) => {
+      const s = vols[k]; const on = s && s.ex;
+      const a = on ? Math.round(18 + 62 * (s.vol / max)) : 0;
+      return `<button class="cal-day${inM ? "" : " out"}${k === todayK() ? " today" : ""}" ${on ? `style="background:color-mix(in srgb,var(--ink) ${a}%,var(--surface))${a > 45 ? ";color:var(--surface)" : ""}"` : ""} data-act="openDay" data-k="${k}" aria-label="${fmtDate(k)}"><span>${parseK(k).getDate()}</span>${on ? `<em style="color:inherit;opacity:.85">${s.vol ? fmtVol(s.vol, false) : s.sets + "set"}</em>` : ""}</button>`;
+    });
+    const n = Object.values(vols).filter(s => s.ex).length;
+    body = `<section class="card hcal"><div class="cal-head"><button class="iconbtn" data-act="histMonth" data-n="-1" aria-label="前の月">${ic("left")}</button><h2>${ymLabel(ui.histMonth)}</h2><button class="iconbtn" data-act="histMonth" data-n="1" aria-label="次の月">${ic("right")}</button></div>${grid}<div class="cal-foot"><span>この月<b>${n}</b>日</span><span class="small muted" style="font-weight:500">色が濃いほど負荷量が大きい日</span></div></section>`;
+  } else {
+    const opts = (pSel ? [pSel] : parts).map(p => `<optgroup label="${esc(p.name)}">${p.ex.filter(e => !e.archived || sessions(e.id).length).map(e => `<option value="${e.id}" ${ui.histEx === e.id ? "selected" : ""}>${esc(e.name)}</option>`).join("")}</optgroup>`).join("");
+    let exId = ui.histEx;
+    const pool = (pSel ? [pSel] : parts).flatMap(p => p.ex.map(e => e.id));
+    if (!exId || !pool.includes(exId)) { exId = pool.find(id => sessions(id).length) || pool[0]; ui.histEx = exId; }
+    const f = exId && findEx(exId);
+    if (!f) body = `<div class="card empty">種目がありません。</div>`;
+    else {
+      const cardio = f.part.kind === "cardio", ss = sessions(exId), b = bests(exId);
+      const sel = `<select class="tf" id="histEx" data-bind="histEx" aria-label="種目を選ぶ">${opts.replace(`value="${exId}"`, `value="${exId}" selected`)}</select>`;
+      if (!ss.length) body = `${sel}<div class="card empty">${esc(f.ex.name)}の記録はまだありません。</div>`;
+      else if (cardio) {
+        body = `${sel}<section class="card"><div class="sec-title" style="margin-bottom:8px"><span>時間（分）</span></div>${lineChart(ss.map(s => ({ k:s.k, y: round1(s.sets.reduce((a, x) => a + (+x.min||0), 0)) })), { fmt:v => `${v}分` })}</section>`;
+      } else {
+        const maxReps = Math.max(...ss.flatMap(s => s.sets.map(x => +x.r || 0)));
+        body = `${sel}
+        <div class="pbs"><div class="tile"><span>推定1RM</span><b>${fmtW(b.rm.v)}<small>${U()}</small></b><span class="small muted" style="font-weight:500">${b.rm.k ? fmtMD(b.rm.k) : ""}</span></div><div class="tile"><span>最大重量</span><b>${fmtW(b.w.v)}<small>${U()}</small></b><span class="small muted" style="font-weight:500">${b.w.k ? `${fmtMD(b.w.k)} ・ ${b.w.r}回` : ""}</span></div><div class="tile"><span>最多レップ</span><b>${maxReps}<small>回</small></b><span class="small muted" style="font-weight:500">${ss.length}回実施</span></div></div>
+        <section class="card"><div class="sec-title" style="margin-bottom:8px"><span>推定1RM（${U()}）</span></div>${lineChart(ss.map(s => ({ k:s.k, y: round1(toD(Math.max(...s.sets.map(x => rm(x.w, x.r))))) })).filter(p => p.y > 0), { fmt:v => `${v}${U()}` })}</section>
+        <section class="card"><div class="sec-title" style="margin-bottom:8px"><span>その日の最大重量（${U()}）</span></div>${lineChart(ss.map(s => ({ k:s.k, y: round1(toD(Math.max(...s.sets.map(x => +x.w || 0)))) })).filter(p => p.y > 0), { fmt:v => `${v}${U()}` })}</section>
+        <section class="card"><div class="sec-title" style="margin-bottom:4px"><span>記録一覧</span></div><div class="sess">${ss.slice(-15).reverse().map(s => `<button data-act="openDay" data-k="${s.k}"><span class="d">${fmtMD(s.k)}</span><span class="s">${s.sets.map(x => fmtSet(x)).join("　")}</span></button>`).join("")}</div></section>`;
+      }
+    }
+  }
+  return `${demoBanner()}${chips}<div>${modes}</div>${body}`;
+}
+
+const BODY = [
+  { k:"wt", l:"体重", u:"kg", in:true }, { k:"fat", l:"体脂肪率", u:"%", in:true }, { k:"mus", l:"筋肉量", u:"kg", in:true }, { k:"waist", l:"ウエスト", u:"cm", in:true },
+  { k:"bmi", l:"BMI", u:"" }, { k:"fatkg", l:"体脂肪量", u:"kg" }, { k:"lean", l:"除脂肪体重", u:"kg" }, { k:"musr", l:"筋肉率", u:"%" }
+];
+function bodyCalc(b){
+  const o = {}; if (!b) return o;
+  const h = state.settings.height;
+  if (b.wt > 0 && h > 0) o.bmi = round1(b.wt / Math.pow(h/100, 2));
+  if (b.wt > 0 && b.fat > 0) { o.fatkg = round1(b.wt * b.fat / 100); o.lean = round1(b.wt - o.fatkg); }
+  if (b.wt > 0 && b.mus > 0) o.musr = round1(b.mus / b.wt * 100);
+  return o;
+}
+function bodyValue(b, k){ if (!b) return null; if (["wt","fat","mus","waist"].includes(k)) return b[k] > 0 ? b[k] : null; const c = bodyCalc(b); return c[k] ?? null; }
+function lastBody(before){ for (const k of keysAsc().reverse()) if (k < before && days()[k].b) return days()[k].b; return null; }
+function bodyCalcHtml(b){
+  const c = bodyCalc(b);
+  return BODY.filter(x => !x.in).map(x => `<div><span>${x.l}</span><b>${c[x.k] ?? "—"}${c[x.k] != null && x.u ? `<small>${x.u}</small>` : ""}</b></div>`).join("");
+}
+function vBody(){
+  const k = ui.bodyDate, b = (days()[k] || {}).b || {}, prev = lastBody(k) || {};
+  const fields = BODY.filter(x => x.in).map(x => `<div class="bf"><label for="b-${x.k}">${x.l}</label><input id="b-${x.k}" inputmode="decimal" data-bind="body" data-f="${x.k}" value="${b[x.k] > 0 ? trimNum(b[x.k], 2) : ""}" placeholder="${prev[x.k] > 0 ? trimNum(prev[x.k], 1) : "—"}"><span class="u">${x.u}</span></div>`).join("")
+    + `<div class="bf" style="grid-template-columns:auto 1fr"><label for="b-memo">メモ</label><input id="b-memo" data-bind="body" data-f="memo" value="${esc(b.memo || "")}" placeholder="体調など" style="font-family:var(--f-body);font-size:15px;font-weight:500;text-align:left"></div>`;
+  const from = ui.bodyRange ? addDays(todayK(), -ui.bodyRange + 1) : "0000";
+  const m = BODY.find(x => x.k === ui.bodyMetric) || BODY[0];
+  const pts = keysAsc().filter(d => d >= from).map(d => ({ k:d, y: bodyValue(days()[d].b, m.k) })).filter(p => p.y != null);
+  const noHeight = !(state.settings.height > 0);
+  return `${demoBanner()}
+  <div class="daynav"><button class="iconbtn" data-act="bodyShift" data-n="-1" aria-label="前の日">${ic("left")}</button><h2>${fmtDate(k)}${k === todayK() ? " ・今日" : ""}</h2><button class="iconbtn" data-act="bodyShift" data-n="1" aria-label="次の日">${ic("right")}</button></div>
+  <section class="card bfields">${fields}</section>
+  <section class="card"><div class="sec-title" style="margin-bottom:8px"><span>自動計算</span>${noHeight ? `<button class="btn sm" data-act="settings">身長を登録するとBMIが出ます</button>` : ""}</div><div class="bcalc" id="bcalc">${bodyCalcHtml(b)}</div></section>
+  <section class="card" style="display:flex;flex-direction:column;gap:10px">
+    <div class="chips" role="group" aria-label="グラフの項目">${BODY.map(x => `<button class="chip" data-act="bodyMetric" data-m="${x.k}" aria-pressed="${m.k === x.k}">${x.l}</button>`).join("")}</div>
+    <div class="seg" role="group" aria-label="期間">${[[30,"1ヶ月"],[90,"3ヶ月"],[365,"1年"],[0,"全期間"]].map(([r, l]) => `<button data-act="bodyRange" data-r="${r}" aria-pressed="${ui.bodyRange === r}">${l}</button>`).join("")}</div>
+    ${lineChart(pts, { fmt:v => `${v}${m.u}`, label:`${m.l}の推移` })}
+  </section>`;
+}
+
+function roundTo(v, step){ return step > 0 ? Math.round(v / step) * step : v; }
+function vRm(){
+  const step = state.settings.round, u = U();
+  let one;
+  if (ui.rmMode === "wr") one = (ui.rmW > 0 && ui.rmR > 0) ? (ui.rmR === 1 ? ui.rmW : fm().f(ui.rmW, ui.rmR)) : 0;
+  else one = ui.rmOne > 0 ? ui.rmOne : 0;
+  const repsList = [1,2,3,4,5,6,7,8,9,10,11,12,15,20];
+  if (ui.rmMode === "wr" && ui.rmR > 0 && !repsList.includes(ui.rmR) && ui.rmR <= 30) { repsList.push(ui.rmR); repsList.sort((a, b) => a - b); }
+  const rows = one ? repsList.map(r => `<tr class="${ui.rmMode === "wr" && r === ui.rmR ? "hl" : ""}"><td>${r}回</td><td>${trimNum(roundTo(weightFor(one, r), step), 2)}</td><td class="pct">${Math.round(weightFor(one, r) / one * 100)}%</td></tr>`).join("") : "";
+  const pcts = [100,95,90,85,80,75,70,65,60,55,50];
+  const prow = one ? pcts.map(p => { const r = p === 100 ? 1 : fm().reps(p/100); return `<tr><td>${p}%</td><td>${trimNum(roundTo(one * p / 100, step), 2)}</td><td class="pct">${p === 100 ? "1" : "約" + Math.max(1, Math.round(r))}回</td></tr>`; }).join("") : "";
+  const inputs = ui.rmMode === "wr"
+    ? `<div class="rm-in"><label class="fld"><input id="rmW" inputmode="decimal" data-bind="rm" data-f="rmW" value="${trimNum(ui.rmW)}" aria-label="重さ"><span>${u}</span></label><span class="x" style="padding-bottom:10px">×</span><label class="fld"><input id="rmR" inputmode="numeric" data-bind="rm" data-f="rmR" value="${ui.rmR || ""}" aria-label="回数"><span>回</span></label></div>`
+    : `<div class="rm-in" style="grid-template-columns:1fr"><label class="fld"><input id="rmOne" inputmode="decimal" data-bind="rm" data-f="rmOne" value="${trimNum(ui.rmOne)}" aria-label="1RM"><span>${u}</span></label></div>`;
+  return `<div class="seg" role="group" aria-label="計算の方法"><button data-act="rmMode" data-m="wr" aria-pressed="${ui.rmMode === "wr"}">重量×回数から</button><button data-act="rmMode" data-m="one" aria-pressed="${ui.rmMode === "one"}">1RMから</button></div>
+  <section class="card">
+    ${inputs}
+    <div class="rm-out"><span>${ui.rmMode === "wr" ? "推定1RM" : "1RM"}</span><b id="rmOut">${one ? trimNum(round1(one), 1) : "—"}<small>${u}</small></b></div>
+  </section>
+  <div class="row"><label class="small muted grow" for="rmFormula">計算式</label><select class="tf" id="rmFormula" data-bind="setting" data-f="formula" style="width:auto;flex:2">${Object.entries(FORMULAS).map(([k, f]) => `<option value="${k}" ${state.settings.formula === k ? "selected" : ""}>${f.name}</option>`).join("")}</select></div>
+  <div class="row"><label class="small muted grow" for="rmRound">重さの丸め（プレートの刻み）</label><select class="tf" id="rmRound" data-bind="setting" data-f="round" style="width:auto">${[0,0.5,1,1.25,2.5,5].map(s => `<option value="${s}" ${state.settings.round === s ? "selected" : ""}>${s ? s + u : "丸めない"}</option>`).join("")}</select></div>
+  <section class="card" id="rmTables">${rmTables(rows, prow, u)}</section>`;
+}
+function rmTables(rows, prow, u){
+  if (!rows) return `<div class="empty">重さと回数を入れると換算表が出ます。</div>`;
+  return `<div class="sec-title" style="margin-bottom:4px"><span>回数ごとの目安重量</span></div><div class="tblwrap"><table class="t"><thead><tr><th>回数</th><th>重さ（${u}）</th><th>1RM比</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="sec-title" style="margin:18px 0 4px"><span>1RMの％ごとの重量</span></div><div class="tblwrap"><table class="t"><thead><tr><th>強度</th><th>重さ（${u}）</th><th>目安回数</th></tr></thead><tbody>${prow}</tbody></table></div>`;
+}
+
+function syncHtml(){
+  const st = { on:["on","この端末＋クラウドに自動保存"], off:["on","この端末に保存（オフライン対応）"], error:["err","クラウド保存に失敗（端末には保存済み）"], connecting:["","接続中…"] }[cloudState];
+  return `<span class="status ${st[0]}" id="syncStatus"><span class="dot"></span>${st[1]}</span>`;
+}
+function renderSync(){ const el = document.getElementById("syncStatus"); if (el) el.outerHTML = syncHtml(); }
+function vSettings(){
+  const s = state.settings;
+  const nDays = Object.values(state.days).filter(d => dayStats(d).ex).length;
+  const imp = ui.importData ? `<div class="banner" style="flex-direction:column;align-items:stretch"><span>読み込むファイル：トレーニング ${Object.values(ui.importData.days).filter(d => (d.w||[]).length).length}日分・種目 ${ui.importData.parts.reduce((a, p) => a + (p.ex || []).length, 0)}件。いまのデータは置き換わります。</span><div class="row"><button class="btn sm danger" data-act="importApply">置き換えて読み込む</button><button class="btn sm" data-act="importCancel">やめる</button></div></div>` : "";
+  const exp = ui.exportText != null ? `<label class="small muted" for="expText">ファイル保存ができない環境です。下の文字をすべてコピーしてメモなどに保存してください。</label><textarea class="tf" id="expText" readonly>${esc(ui.exportText)}</textarea><button class="btn sm" data-act="copyExport">${ic("copy")}コピー</button>` : "";
+  return `<section class="card setlist">
+    <div class="si"><span>重さの単位</span><div class="seg" role="group"><button data-act="unit" data-u="kg" aria-pressed="${s.unit === "kg"}">kg</button><button data-act="unit" data-u="lbs" aria-pressed="${s.unit === "lbs"}">lbs</button></div></div>
+    <div class="si"><span>身長<small>BMIの計算に使います</small></span><div class="row"><input class="tf num" id="setHeight" inputmode="decimal" data-bind="setting" data-f="height" value="${s.height || ""}" placeholder="170" style="width:96px;text-align:right;font-size:20px"><span class="muted">cm</span></div></div>
+    <div class="si"><span>休憩タイマーの初期値</span><div class="row"><input class="tf num" id="setRest" inputmode="numeric" data-bind="setting" data-f="rest" value="${s.rest}" style="width:96px;text-align:right;font-size:20px"><span class="muted">秒</span></div></div>
+    <div class="si"><span>RMの計算式</span><select class="tf" id="setFormula" data-bind="setting" data-f="formula">${Object.entries(FORMULAS).map(([k, f]) => `<option value="${k}" ${s.formula === k ? "selected" : ""}>${f.name}</option>`).join("")}</select></div>
+  </section>
+  <div class="sec-title"><span>データ</span></div>
+  <section class="card setlist">
+    <div class="si"><span>保存先<small>記録 ${nDays}日分</small></span>${syncHtml()}</div>
+    <div class="si"><span>書き出し<small>機種変更やバックアップ用のファイル（JSON）</small></span><button class="btn sm" data-act="export">書き出す</button></div>
+    <div class="si"><span>読み込み<small>書き出したファイルから復元します</small></span><button class="btn sm" data-act="importPick">ファイルを選ぶ</button></div>
+    ${imp}${exp}
+  </section>
+  <section class="card small muted">記録はこの端末の中だけに保存されます。機種変更やもしもの時のために、ときどき「書き出す」でバックアップを取ってください（iPhoneでは共有メニューから「"ファイル"に保存」を選べます）。</section>`;
+}
+
+/* ---------- render ---------- */
+function render(resetScroll){
+  charts = {};
+  $("#top").innerHTML = header();
+  $("#tabs").innerHTML = tabsHtml();
+  const V = { home:vHome, day:vDay, pick:vPick, ex:vEx, grp:vGrp, hist:vHist, body:vBody, rm:vRm, settings:vSettings }[view.name] || vHome;
+  const main = $("#main"), y = main.scrollTop;
+  main.innerHTML = V();
+  main.scrollTop = resetScroll ? 0 : y;
+  bindCharts();
+  bindRmq();
+}
+function bindRmq(){
+  const row = $("#rmqChips"), th = $("#rmqThumb"), wrap = row && row.parentElement, sw = $("#rmqSwipe");
+  if (!row || !th) return;
+  const upd = () => {
+    const max = row.scrollWidth - row.clientWidth, frac = row.scrollWidth ? row.clientWidth / row.scrollWidth : 1;
+    th.style.width = Math.max(12, frac * 100) + "%";
+    th.style.left = (max > 0 ? row.scrollLeft / max * (100 - frac * 100) : 0) + "%";
+    const end = max <= 2 || row.scrollLeft >= max - 2;
+    wrap.classList.toggle("at-end", end); if (sw) sw.classList.toggle("done", end);
+  };
+  row.addEventListener("scroll", upd, { passive:true }); upd();
+}
+
+/* ---------- actions ---------- */
+const A = {
+  back, settings: () => go("settings"), tab: d => tab(d.t),
+  arm: d => { armed = d.key; render(); },
+  hideDemo: () => { exitDemo(); render(); },
+  homeMonth: d => { ui.homeMonth = shiftYM(ui.homeMonth, +d.n); render(); },
+  openDay: d => go("day", { date:d.k }),
+  dayShift: d => { view.date = addDays(view.date, +d.n); render(true); },
+  openEx: d => go("ex", { date:d.k, ex:d.ex }),
+  pick: () => { ui.pickQ = ""; go("pick", { date:view.date }); },
+  moveW: d => { const day = mutDay(view.date), bl = blocks(day.w.filter(w => findEx(w.ex))), i = +d.i, j = i + +d.d; if (j < 0 || j >= bl.length) return; [bl[i], bl[j]] = [bl[j], bl[i]]; day.w = bl.flatMap(b => b.ws); commitDay(view.date); render(); },
+  delG: d => { const day = mutDay(view.date); day.w = day.w.filter(w => w.grp !== d.g); commitDay(view.date); armed = null; render(); },
+  openGrp: d => go("grp", { date:d.k, grp:d.g }),
+  delW: d => { const day = mutDay(view.date); day.w = day.w.filter(w => w.ex !== d.ex); commitDay(view.date); armed = null; render(); },
+  pickEx: d => {
+    if (view.addTo) {
+      const k = view.date, grp = view.addTo, day = mutDay(k);
+      let w = day.w.find(x => x.ex === d.ex);
+      if (w && w.grp === grp) { back(); return; }
+      if (w) { if (w.grp) ungroupOne(k, w); day.w.splice(day.w.indexOf(w), 1); w.sets = w.sets.filter(nonEmpty); } else w = { ex:d.ex, sets:[] };
+      const ms = groupOf(day, grp), m = ms.length ? methodOf(ms[0]) : "super";
+      const R = Math.max(1, ...ms.map(x => x.sets.length)); while (w.sets.length < R) w.sets.push({});
+      w.grp = grp; w.method = m;
+      const last = ms.length ? Math.max(...ms.map(x => day.w.indexOf(x))) : day.w.length - 1;
+      day.w.splice(last + 1, 0, w);
+      commitDay(k); view = stack.pop(); armed = null; render(true); return;
+    }
+    const k = view.date; const w = mutW(k, d.ex); if (!w.sets.length) w.sets.push({}); commitDay(k); leaveView(); view = { name:"ex", date:k, ex:d.ex }; render(true); },
+  exType: d => { exitDemo(); const f = findEx(d.ex); const t = typeOf(f.ex); f.ex.type = t === "c" ? "i" : t === "i" ? "n" : "c"; markDirty("meta"); render(); },
+  pickEdit: () => { ui.pickEdit = !ui.pickEdit; armed = null; render(); },
+  partColor: d => { exitDemo(); const p = state.parts.find(p => p.id === d.p); p.color = COLORS[(COLORS.indexOf(p.color) + 1) % COLORS.length]; markDirty("meta"); render(); },
+  delEx: d => { exitDemo(); const p = state.parts.find(p => p.id === d.p); const e = p.ex.find(e => e.id === d.ex); if (sessions(e.id).length) e.archived = true; else p.ex = p.ex.filter(x => x !== e); markDirty("meta"); armed = null; render(); },
+  delPart: d => { exitDemo(); const p = state.parts.find(p => p.id === d.p); if (p.ex.some(e => sessions(e.id).length)) { p.archived = true; p.ex.forEach(e => e.archived = true); } else state.parts = state.parts.filter(x => x !== p); markDirty("meta"); armed = null; render(); toast(`「${p.name}」を削除しました`); },
+  unit: d => { exitDemo(); state.settings.unit = d.u; markDirty("meta"); render(); },
+  restAdj: d => { exitDemo(); state.settings.rest = Math.min(900, Math.max(15, state.settings.rest + +d.n)); markDirty("meta"); render(); },
+  restStart: () => startRest(state.settings.rest),
+  timerAdd: () => { timer.end += 15000; timer.total += 15; tickTimer(); },
+  timerStop: stopRest,
+  addSet: () => {
+    const w = mutW(view.date, view.ex), p = w.sets[w.sets.length - 1] || {};
+    const nw = p.w > 0 ? (methodOf(w) === "asc" ? p.w + (w.step || 2.5) : p.w) : 0;
+    w.sets.push(isCardioEx(view.ex) ? {} : (nw > 0 ? { w:nw } : {})); commitDay(view.date); render();
+    const i = w.sets.length - 1, el = $(isCardioEx(view.ex) ? `#min-${i}` : (w.sets[i].w ? `#r-${i}` : `#w-${i}`)); if (el) { el.focus(); el.scrollIntoView({ block:"center" }); }
+  },
+  sameSet: d => { const w = mutW(view.date, view.ex), i = +d.i, p = w.sets[i-1]; if (!p) return; Object.assign(w.sets[i], { w:p.w, r:p.r, a:p.a, ar:p.ar, min:p.min, km:p.km }); commitDay(view.date); render(); },
+  doneSet: d => { const w = mutW(view.date, view.ex), s = w.sets[+d.i]; s.d = !s.d; commitDay(view.date); render(); if (s.d && validSet(s, isCardioEx(view.ex)) && !isCardioEx(view.ex)) startRest(state.settings.rest); },
+  assistSet: d => { const w = mutW(view.date, view.ex), s = w.sets[+d.i]; s.a = d.v === "1"; if (!s.a) s.ar = null; commitDay(view.date); render(); if (s.a) { const el = $(`#ar-${d.i}`); if (el) el.focus(); } },
+  feelSet: d => { const w = mutW(view.date, view.ex), s = w.sets[+d.i]; s.feel = s.feel === +d.v ? null : +d.v; commitDay(view.date); render(); },
+  tagSet: d => { const w = mutW(view.date, view.ex), s = w.sets[+d.i]; s.tags = s.tags || []; s.tags = s.tags.includes(d.t) ? s.tags.filter(t => t !== d.t) : s.tags.concat(d.t); if (!s.tags.length) delete s.tags; commitDay(view.date); render(); },
+  condToggle: d => { const i = +d.i; condOpen.has(i) ? condOpen.delete(i) : condOpen.add(i); render(); if (condOpen.has(i)) { const el = $(`#m-${i}`); if (el) el.scrollIntoView({ block:"nearest" }); } },
+  delSet: d => { condOpen.clear(); const w = mutW(view.date, view.ex); w.sets.splice(+d.i, 1); if (!w.sets.length) w.sets.push({}); commitDay(view.date); render(); },
+  copyLast: () => {
+    const ls = lastSession(view.ex, view.date); if (!ls) return;
+    const w = mutW(view.date, view.ex);
+    w.sets = w.sets.filter(nonEmpty).concat(ls.sets.map(s => { const c = { ...s }; delete c.d; delete c.m; delete c.feel; delete c.tags; return c; }));
+    commitDay(view.date); render(); toast("前回の記録をコピーしました。今日の値に直してください");
+  },
+  setMethod: d => {
+    const k = view.date, m = d.m, M = METHODS[m], w = mutW(k, view.ex);
+    if (!w.sets.length) w.sets.push({});
+    if (M.group) {
+      if (!w.grp) w.grp = uid();
+      groupOf(state.days[k], w.grp).forEach(x => x.method = m);
+      commitDay(k); condOpen.clear(); armed = null;
+      view = { name:"grp", date:k, grp:w.grp }; render(true); return;
+    }
+    if (w.grp) ungroupOne(k, w);
+    w.method = m; commitDay(k); render();
+  },
+  setMethodG: d => { const k = view.date, day = mutDay(k); groupOf(day, view.grp).forEach(x => x.method = d.m); commitDay(k); render(); },
+  mParam: d => {
+    const w = mutW(view.date, view.ex), n = +d.n;
+    const cyc = (opts, cur) => { let i = opts.indexOf(cur); if (i < 0) i = Math.max(0, opts.findIndex(o => o >= cur)); return opts[Math.min(opts.length - 1, Math.max(0, i + n))]; };
+    if (d.key === "dropPct") w.dropPct = cyc(DROP_OPTS, w.dropPct || 20);
+    if (d.key === "pause") w.pause = cyc(PAUSE_OPTS, w.pause || 15);
+    if (d.key === "step") w.step = cyc(STEP_OPTS, w.step || 2.5);
+    commitDay(view.date); render();
+  },
+  addSub: d => {
+    const w = mutW(view.date, view.ex), i = +d.i, s = w.sets[i], m = methodOf(w);
+    s.sub = s.sub || [];
+    const prev = s.sub.length ? s.sub[s.sub.length - 1] : s;
+    let nw = prev.w;
+    if (m === "drop" && prev.w > 0) nw = fromD(roundTo(toD(prev.w * (1 - (w.dropPct || 20) / 100)), state.settings.round || 0.5));
+    s.sub.push({ w: nw > 0 ? nw : null, r: null }); commitDay(view.date); render();
+    if (m === "restpause") startRest(w.pause || 15);
+    const el = $(`#sr-${i}-${s.sub.length - 1}`); if (el) el.focus();
+  },
+  delSub: d => { const w = mutW(view.date, view.ex), s = w.sets[+d.i]; s.sub.splice(+d.j, 1); if (!s.sub.length) delete s.sub; commitDay(view.date); render(); },
+  grpAdd: () => { ui.pickQ = ""; go("pick", { date:view.date, addTo:view.grp }); },
+  grpRemove: d => {
+    const k = view.date, day = mutDay(k), w = day.w.find(x => x.ex === d.ex); if (!w) return;
+    const grp = w.grp; ungroupOne(k, w);
+    w.sets = w.sets.filter(nonEmpty); if (!w.sets.length) day.w.splice(day.w.indexOf(w), 1);
+    commitDay(k);
+    if (groupOf(day, grp).length) render(); else { view = stack.pop() || { name:"day", date:k }; render(true); }
+  },
+  grpUngroup: () => {
+    const k = view.date, day = mutDay(k);
+    groupOf(day, view.grp).forEach(w => { delete w.grp; w.method = "straight"; w.sets = w.sets.filter(nonEmpty); });
+    day.w = day.w.filter(w => w.grp || w.sets.length);
+    commitDay(k); view = stack.pop() || { name:"day", date:k }; render(true); toast("セットを解除しました");
+  },
+  grpAddRound: () => {
+    const k = view.date, day = mutDay(k), ms = groupOf(day, view.grp), R = Math.max(1, ...ms.map(w => w.sets.length));
+    ms.forEach(w => { while (w.sets.length < R) w.sets.push({}); const p = w.sets[R-1] || {}; w.sets.push(p.w > 0 ? { w:p.w } : {}); });
+    commitDay(k); render();
+    const el = $(`#g-0-${R}-r`) || $(`#g-0-${R}-w`) || $(`#g-0-${R}-min`); if (el) { el.focus(); el.scrollIntoView({ block:"center" }); }
+  },
+  grpDelRound: d => { const k = view.date, day = mutDay(k), r = +d.r; groupOf(day, view.grp).forEach(w => { if (w.sets.length > r) w.sets.splice(r, 1); if (!w.sets.length) w.sets.push({}); }); commitDay(k); render(); },
+  grpDone: d => {
+    const k = view.date, day = mutDay(k), r = +d.r, ms = groupOf(day, view.grp);
+    const on = !ms.every(w => w.sets[r] && w.sets[r].d);
+    ms.forEach(w => { while (w.sets.length <= r) w.sets.push({}); w.sets[r].d = on; });
+    commitDay(k); render(); if (on) startRest(state.settings.rest);
+  },
+  rmqToggle: () => { ui.rmqOpen = !ui.rmqOpen; render(); },
+  rmPick: d => {
+    const w = mutW(view.date, view.ex);
+    let t = w.sets.find(x => !(x.w > 0) && !(x.r > 0));
+    if (!t) { t = {}; w.sets.push(t); }
+    t.w = +d.kg; t.r = +d.r; commitDay(view.date); render();
+    toast(`${fmtW(+d.kg)}${U()} × ${d.r}回 を入力しました`);
+  },
+  histPart: d => { ui.histPart = d.p; render(); },
+  histMode: d => { ui.histMode = d.m; render(); },
+  histRange: d => { ui.histRange = +d.r; render(); },
+  histMonth: d => { ui.histMonth = shiftYM(ui.histMonth, +d.n); render(); },
+  bodyShift: d => { ui.bodyDate = addDays(ui.bodyDate, +d.n); render(); },
+  bodyMetric: d => { ui.bodyMetric = d.m; render(); },
+  bodyRange: d => { ui.bodyRange = +d.r; render(); },
+  rmMode: d => { if (d.m === "one" && ui.rmMode === "wr" && ui.rmW > 0 && ui.rmR > 0) ui.rmOne = round1(ui.rmR === 1 ? ui.rmW : fm().f(ui.rmW, ui.rmR)); ui.rmMode = d.m; render(); },
+  export: async () => {
+    const data = JSON.stringify({ app:"REP", version:1, exportedAt:new Date().toISOString(), settings:state.settings, parts:state.parts, days:state.days }, null, 1);
+    const name = `rep-${todayK()}.json`;
+    try {
+      const file = new File([data], name, { type:"application/json" });
+      if (navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], title:"REP バックアップ" }); toast("書き出しました"); return; }
+    } catch(e) { if (e && e.name === "AbortError") return; }
+    try {
+      const url = URL.createObjectURL(new Blob([data], { type:"application/json" }));
+      const el = document.createElement("a"); el.href = url; el.download = name; document.body.appendChild(el); el.click(); el.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000); toast("書き出しました"); return;
+    } catch(e) {}
+    ui.exportText = data; render();
+  },
+  copyExport: async () => { const ta = $("#expText"); try { await navigator.clipboard.writeText(ta.value); toast("コピーしました"); } catch(e) { ta.focus(); ta.select(); toast("選択しました。コピーしてください"); } },
+  importPick: () => $("#importFile").click(),
+  importCancel: () => { ui.importData = null; render(); },
+  importApply: () => {
+    const d = ui.importData; if (!d) return;
+    const oldMonths = Object.keys(state._mt).filter(k => k !== "meta");
+    state.demo = false;
+    state.settings = { ...DEFAULT_SETTINGS, ...(d.settings || {}) };
+    state.parts = d.parts; state.days = d.days; exMap = null;
+    const months = new Set([...oldMonths, ...Object.keys(d.days).map(k => k.slice(0, 7))]);
+    markDirty("meta"); months.forEach(m => markDirty(m));
+    ui.importData = null; render(); toast("読み込みました");
+  }
+};
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act]");
+  if (!t) { if (armed) { armed = null; render(); } return; }
+  const act = t.dataset.act;
+  if (armed && act !== "arm" && !["delW","delEx","delPart"].includes(act)) armed = null;
+  try { A[act] && A[act](t.dataset, t); } catch(err) { if (err && err.message !== "wait") console.error(err); }
+});
+document.addEventListener("submit", e => {
+  const f = e.target.closest("[data-form]"); if (!f) return;
+  e.preventDefault();
+  try {
+    if (f.dataset.form === "addEx") {
+      const inp = f.querySelector("input"), name = inp.value.trim(); if (!name) return;
+      exitDemo(); const p = state.parts.find(p => p.id === f.dataset.p);
+      p.ex.push({ id:uid(), name }); markDirty("meta"); render(); toast(`「${name}」を追加しました`);
+    } else if (f.dataset.form === "addPart") {
+      const inp = f.querySelector("input"), name = inp.value.trim(); if (!name) return;
+      exitDemo(); state.parts.push({ id:uid(), name, color:COLORS[state.parts.length % COLORS.length], kind:"weight", ex:[] }); markDirty("meta"); render();
+    }
+  } catch(err) { if (err && err.message !== "wait") console.error(err); }
+});
+
+const B = {
+  set: t => {
+    const i = +t.dataset.i, f = t.dataset.f, w = mutW(view.date, view.ex), s = w.sets[i]; if (!s) return;
+    if (f === "sw" || f === "sr") { const x = (s.sub || [])[+t.dataset.j]; if (!x) return; const v = num(t.value); if (f === "sw") x.w = v > 0 ? fromD(v) : null; else x.r = v > 0 ? Math.round(v) : null; commitDay(view.date); return; }
+    if (f === "m") s.m = t.value;
+    else { const v = num(t.value); if (f === "w") s.w = v > 0 ? fromD(v) : null; else if (f === "r" || f === "ar") s[f] = v > 0 ? Math.round(v) : null; else s[f] = v > 0 ? v : null; }
+    const rmEl = $(`#rm-${i}`); if (rmEl) rmEl.textContent = rmText(s);
+    commitDay(view.date);
+  },
+  body: t => {
+    const d = mutDay(ui.bodyDate); d.b = d.b || {};
+    const f = t.dataset.f;
+    if (f === "memo") d.b.memo = t.value || null; else { const v = num(t.value); d.b[f] = v > 0 ? v : null; }
+    $("#bcalc").innerHTML = bodyCalcHtml(d.b);
+    commitDay(ui.bodyDate);
+  },
+  rm: t => {
+    const v = num(t.value);
+    if (t.dataset.f === "rmR") ui.rmR = v > 0 ? Math.round(v) : 0; else ui[t.dataset.f] = v > 0 ? v : 0;
+    let one = ui.rmMode === "wr" ? ((ui.rmW > 0 && ui.rmR > 0) ? (ui.rmR === 1 ? ui.rmW : fm().f(ui.rmW, ui.rmR)) : 0) : ui.rmOne;
+    $("#rmOut").innerHTML = `${one ? trimNum(round1(one), 1) : "—"}<small>${U()}</small>`;
+    const tmp = document.createElement("div"); tmp.innerHTML = vRm(); $("#rmTables").innerHTML = tmp.querySelector("#rmTables").innerHTML;
+  },
+  setting: t => {
+    exitDemo();
+    const f = t.dataset.f, s = state.settings;
+    if (f === "formula") s.formula = t.value;
+    else if (f === "round") s.round = +t.value;
+    else if (f === "height") { const v = num(t.value); s.height = v > 50 && v < 260 ? v : null; }
+    else if (f === "rest") { const v = num(t.value); if (v >= 5 && v <= 900) s.rest = Math.round(v); }
+    markDirty("meta");
+    if (t.tagName === "SELECT") render();
+  },
+  pickQ: t => { ui.pickQ = t.value; const tmp = document.createElement("div"); tmp.innerHTML = vPick(); $("#pickList").innerHTML = tmp.querySelector("#pickList").innerHTML; },
+  renEx: t => { exitDemo(); const f = findEx(t.dataset.ex); const n = t.value.trim(); if (f && n) { f.ex.name = n; markDirty("meta"); } },
+  renPart: t => { exitDemo(); const p = state.parts.find(p => p.id === t.dataset.p); const n = t.value.trim(); if (p && n) { p.name = n; markDirty("meta"); } },
+  histEx: t => { ui.histEx = t.value; render(); },
+  gset: t => {
+    const k = view.date, day = mutDay(k), w = day.w.find(x => x.ex === t.dataset.ex); if (!w) return;
+    const r = +t.dataset.r; while (w.sets.length <= r) w.sets.push({});
+    const s = w.sets[r], v = num(t.value), f = t.dataset.f;
+    if (f === "w") s.w = v > 0 ? fromD(v) : null; else if (f === "r") s.r = v > 0 ? Math.round(v) : null; else s[f] = v > 0 ? v : null;
+    commitDay(k);
+  },
+  rmqBase: t => { const v = num(t.value); if (v > 0) ui.rmBase[view.ex] = fromD(v); else delete ui.rmBase[view.ex]; const el = $("#rmqChips"); if (el) { el.innerHTML = rmqChips(view.ex); bindRmq(); } }
+};
+function handleBind(e){
+  const t = e.target; const b = t.dataset && t.dataset.bind; if (!b || !B[b]) return;
+  if (t.tagName === "SELECT" && e.type === "input") return;
+  try { B[b](t); } catch(err) { if (err && err.message === "wait") { render(); } else console.error(err); }
+}
+document.addEventListener("input", handleBind);
+document.addEventListener("change", e => { if (e.target.tagName === "SELECT") handleBind(e); });
+document.addEventListener("focusin", e => {
+  if (!state.demo) return;
+  const t = e.target;
+  if (t.matches("input[data-bind='set'],input[data-bind='gset'],textarea[data-bind='set'],input[data-bind='body'],input[data-bind='renEx'],input[data-bind='renPart']")) {
+    const id = t.id;
+    try { exitDemo(); } catch(err) { t.blur(); return; }
+    render(); const el = document.getElementById(id); if (el) el.focus();
+  }
+});
+$("#importFile").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      if (!d || !Array.isArray(d.parts) || typeof d.days !== "object") throw new Error("bad");
+      ui.importData = d; render();
+    } catch(err) { toast("このファイルは読み込めません。REPで書き出したJSONファイルを選んでください"); }
+    e.target.value = "";
+  };
+  r.readAsText(file);
+});
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); else if (timer.id) tickTimer(); });
+
+/* ---------- boot ---------- */
+hadLocal = loadLocal();
+if (!hadLocal) state.demo = true;
+DEMO = makeDemo();
+render(true);
+cloudState = "off";
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e) {}
+if ("serviceWorker" in navigator) {
+  const hadCtl = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register("./sw.js").then(reg => {
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+  }).catch(() => {});
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadCtl) $("#updbar").hidden = false; });
+}
+</script>
+
+</body>
+</html>
